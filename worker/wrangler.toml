@@ -9,3 +9,6 @@ AGENT_ENDPOINT = "https://pin-annually-representatives-improvement.trycloudflare
 binding = "DEVPILOT_KV"
 id = "e1564d2bb1504c88870ccd570aad7de1" # Real KV ID
 preview_id = "yyyy-yyyy-yyyy-yyyy"
+
+[ai]
+binding = "AI"
