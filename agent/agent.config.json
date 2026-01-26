@@ -1,0 +1,21 @@
+{
+    "agentId": "devpilot-agent-local-1",
+    "listen": {
+        "host": "0.0.0.0",
+        "port": 4001
+    },
+    "projects": [
+        {
+            "id": "proj_devpilot",
+            "name": "DevPilot",
+            "root": "E:/DevPilot",
+            "allowedCommands": [
+                "npm test",
+                "npm run lint",
+                "npm run build",
+                "npm run dev",
+                "go test ./..."
+            ]
+        }
+    ]
+}

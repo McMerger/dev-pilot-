@@ -1,310 +1,230 @@
-markdown
+# DevPilot
 
-# DevPilot (Working Name)
+Work on your projects from your phone. DevPilot is an open-source sidecar agent that lets you send natural-language coding tasks to your dev machine from anywhere.
 
-DevPilot is a **sidecar coding agent** that lets you keep working on your projects **from your phone or any browser**, even when you’re away from your laptop or desktop.
+You type a prompt into a mobile-friendly web app. DevPilot forwards your task to a local agent running on your machine, which edits files and runs commands in the projects you have open in your IDE.
 
-You type a prompt into a web app that looks and feels like the **Google Antigravity Agent panel** (prompt box, mode selector, model selector).
-DevPilot then drives a **Local Agent** running on your machine, which edits files and runs commands in the projects you have open in your IDE (including those on external drives).
-
-Your IDE (Antigravity, VS Code, Cursor, etc.) just needs the repo open; DevPilot handles the remote automation.
+Works with any IDE: VS Code, Cursor, Windsurf, Antigravity, Neovim, JetBrains, or anything that opens files from disk.
 
 ---
 
-## Core Goal
+## Features
 
-> Let you continue real work on your existing projects **from your phone**, by sending natural-language tasks to a safe agent that runs next to your IDE on your home/office machine.
-
-Examples:
-
-- On the bus: “Add input validation and unit tests for the user signup endpoint.”
-- At dinner: “Refactor the dashboard layout to use CSS grid and update snapshots.”
-- Late at night: “Run tests on the new feature branch and summarize failures.”
-
-DevPilot turns those into concrete file edits and commands on your machine while you’re away.
+- Remote development from your phone
+- IDE-agnostic — works alongside any editor
+- Bring your own AI — use Gemini, Claude, GPT, or any LLM API
+- Safe execution via whitelisted commands and sandboxed file access
+- Real-time status updates
 
 ---
 
-## High-Level Architecture
+## Architecture
 
-DevPilot has two parts:
-
-1. **Cloud App (UI + Orchestrator) – Cloudflare**
-2. **Local Agent – Your Machine**
-
-Your IDE opens the same folders that the Local Agent is allowed to modify.
-
-### 1. Cloud App (Cloudflare)
-
-Hosted on **Cloudflare Pages + Workers**.
-
-**Responsibilities**
-
-- Provide an **Antigravity-style Agent UI**:
-- Big “Ask anything…” prompt box.[web:37][web:132]
-- **Mode selector** (e.g., `Fast`, `Planning`).[web:37][web:128][web:132]
-- **Model selector** chip (e.g., `Gemini 3 Pro High`, `Gemini 3 Pro Low`, `Claude Sonnet 4.5`, `GPT OSS 120B`).[web:132]
-- **Project selector** (logical projects like “Client Site 2026”, “Sports Analytics API”).
-- Handle:
-- Auth (login, sessions).
-- Task creation and history.
-- Calling the chosen model with tools.
-- Forwarding tool calls to the Local Agent.
-
-**Implementation**
-
-- **Frontend:** React (or similar) on Cloudflare Pages.
-- **Backend API:** Cloudflare Workers (TypeScript) for:
-- `POST /api/tasks`
-- `GET /api/tasks/:id`
-- `GET /api/models`
-- `GET /api/projects`[web:88][web:89][web:96][web:102]
-
-The Cloud App is what you use from your **phone or browser**; it never touches your disk directly.
-
-### 2. Local Agent (Your Machine)
-
-Runs on your dev box (Windows 11 + WSL2 recommended; Linux/macOS also fine).
-
-**Responsibilities**
-
-- Map **project IDs** to real directories, including external drives:
-- Example mapping: `proj_client_site` → `/mnt/e/dev/client-site-2026`.[web:52][web:59]
-- Expose a small HTTP API to execute tools:
-- `list_files`
-- `read_file`
-- `apply_patch`
-- `run_command`
-- Enforce safety:
-- Only operate inside whitelisted roots.
-- Only run whitelisted commands per project.
-
-**Implementation**
-
-- **Runtime:** Node.js (TypeScript) in WSL2 on Windows 11 (or directly on Linux/macOS).[web:52]
-- **Config:** `agent.config.json` to define:
-- Agent ID, host/port.
-- Projects and root paths.
-- Allowed commands.
-
----
-
-## Phone-First / Remote-First Workflow
-
-This is the **main design target**.
-
-### Requirements
-
-- Your dev machine (laptop/desktop) is on and the Local Agent is running.
-- Your IDE has the repo open (Antigravity, VS Code, etc.).
-- DevPilot Cloud App is reachable from your phone (mobile browser).
-
-### Flow
-
-1. **At your desk (setup once)**
-
-- Start the Local Agent.
-- Open IDE with project(s) you care about.
-- Confirm Local Agent can see the project roots (including external drives via `/mnt/e/...`).
-
-1. **Away from your machine (phone)**
-
-- Open DevPilot in mobile browser (Cloudflare Pages URL).
-- Select:
-- Project: e.g., `Client Site 2026`.
-- Mode: `Planning` or `Fast`.
-- Model: e.g., `Gemini 3 Pro High` or `Claude Sonnet 4.5`.
-- Type a prompt, for example:
-
-> “Scan this repo for TODOs in the `api` folder, create tickets.md summarizing them, and add a basic Jest test for the `userController`.”
-
-1. **Cloud App (Worker)**
-
-- Authenticates you and creates a Task.
-- Calls the chosen model with:
-- System prompt.
-- Your prompt.
-- Tool definitions (list_files, read_file, apply_patch, run_command).
-- Forwards tool calls to the Local Agent endpoint.
-
-1. **Local Agent**
-
-- Lists files under the project root.
-- Reads relevant files.
-- Applies patches to create/update files.
-- Runs tests/commands (e.g., `npm test`).
-- Returns outputs (diff results, command logs) to the Cloud App.
-
-1. **Cloud App → Phone**
-
-- Updates the Task status and log view so you can see what happened.
-- Optionally shows simple summaries and a list of files touched.
-
-1. **Back at your machine**
-
-- IDE shows all file changes.
-- You can refine further using your IDE’s own agents (Antigravity Agent panel) or DevPilot again.
-
-The whole experience is “continue working from phone by commanding your home dev box indirectly through a safe agent.”[web:154][web:155][web:156]
-
----
-
-## UI: Antigravity-Style Agent Panel
-
-DevPilot’s main screen intentionally mirrors the **Antigravity Agent** panel for familiarity.[web:37][web:131][web:132]
-
-### Components
-
-- **Top bar**
-- Project selector dropdown.
-- Connection indicator to Local Agent (Online/Offline).
-
-- **Agent header**
-- “DevPilot Agent” title.
-- Mode dropdown (e.g., `Fast`, `Planning`).
-- Model selector chip (Gemini / Claude / GPT OSS labels).[web:132]
-
-- **Prompt area**
-- Multi-line input:
-- Placeholder: `Ask anything, @ to mention, / for workflows` (customizable).[web:37][web:132]
-- Send button (arrow icon).
-
-- **Task list / log**
-- Each task shows:
-- Status badge (`Planning`, `Running`, `Done`, `Error`).
-- Short title (first sentence of the prompt).
-- Key actions (e.g., `edited: src/api/user.ts`, `ran: npm test`).
-
-This UI is what you see from both desktop browser and phone.
-
----
-
-## Task & Tool Model
-
-### Task Object
-
-```json
-{
-"id": "task_123",
-"userId": "user_abc",
-"projectId": "proj_client_site",
-"prompt": "Add JWT auth and tests",
-"mode": "Planning",
-"modelId": "claude-sonnet-4.5",
-"status": "running",
-"logs": [],
-"resultSummary": null,
-"createdAt": "...",
-"updatedAt": "..."
-}
+```
+┌─────────────────┐        ┌────────────────────┐        ┌──────────────────┐
+│  Your Phone     │   →    │  Cloudflare Worker │   →    │   Local Agent    │
+│  (Web App)      │   ←    │  (API + LLM Call)  │   ←    │  (Your Machine)  │
+└─────────────────┘        └────────────────────┘        └──────────────────┘
+                                    ↓
+                           ┌────────────────┐
+                           │  LLM API       │
+                           │  (Gemini/etc)  │
+                           └────────────────┘
 ```
 
-### Tools (Local Agent)
-
-- `list_files(path, glob?)`
-- `read_file(path)`
-- `apply_patch(operations[])` – preferred for safe multi-file edits.[web:77]
-- `run_command(command, cwd)` – only from an allowlist (`npm test`, `npm run lint`, etc.).
-
-The Cloudflare Worker runs the agent loop (model + tools), the Local Agent just executes tools on disk.
+| Component | Tech | Purpose |
+|-----------|------|---------|
+| Web App | React, TypeScript, Tailwind | Mobile-friendly UI |
+| Worker | Cloudflare Workers, Hono | API orchestration, LLM calls |
+| Agent | Go | Local file and command execution |
 
 ---
 
-## Setup Instructions
+## Quick Start
 
-### 1. Local Agent (WSL2 / Linux / macOS)
+### Prerequisites
+
+- Node.js 18+
+- Go 1.21+
+- Cloudflare account (for Workers deployment)
+
+### 1. Clone and Install
 
 ```bash
-git clone https://github.com/yourname/devpilot-agent.git
-cd devpilot-agent
+git clone https://github.com/McMerger/dev-pilot-.git
+cd dev-pilot-
+
+# Frontend
 npm install
+
+# Worker
+cd worker && npm install && cd ..
+
+# Agent
+cd agent && go mod tidy && cd ..
 ```
 
-Create `agent.config.json`:
+### 2. Configure the Local Agent
+
+Edit `agent/agent.config.json` to add your projects:
 
 ```json
 {
-"agentId": "devpilot-agent-local-1",
-"listen": { "host": "0.0.0.0", "port": 4001 },
-"projects": [
-{
-"id": "proj_client_site",
-"name": "Client Site 2026",
-"root": "/mnt/e/dev/client-site-2026",
-"allowedCommands": ["npm test", "npm run lint", "npm run build"]
-}
-]
+  "agentId": "my-devpilot-agent",
+  "listen": { "host": "0.0.0.0", "port": 4001 },
+  "projects": [
+    {
+      "id": "my-project",
+      "name": "My Project",
+      "root": "/path/to/your/project",
+      "allowedCommands": ["npm test", "npm run build", "go test ./..."]
+    }
+  ]
 }
 ```
 
-Run:
+### 3. Run Locally
+
+Terminal 1 — Go Agent:
+
+```bash
+cd agent && go run .
+```
+
+Terminal 2 — Cloudflare Worker (local dev):
+
+```bash
+cd worker && npm run dev
+```
+
+Terminal 3 — Frontend:
 
 ```bash
 npm run dev
 ```
 
-(Optional) Expose via **Cloudflared** or **Tailscale** so the Cloud App can reach it securely.
+Open `http://localhost:5173` on your phone (same network) or desktop.
 
-### 2. Cloud App (Cloudflare Pages + Workers)
+---
 
-- **Frontend (Pages)** – repo `devpilot-web/`
-- Build React app with:
-- Agent panel UI.
-- Project and task views.
+## Using with Your IDE
 
-- **Backend (Workers)** – repo `devpilot-worker/`
-- Endpoints:
-- `POST /api/tasks`
-- `GET /api/tasks/:id`
-- `GET /api/models`
-- `GET /api/projects`
+DevPilot does not replace your IDE's AI features. It extends them for remote use.
 
-`worker.config.json` example:
+1. Keep your IDE open with the project folder loaded
+2. Start the Local Agent on the same machine
+3. Use DevPilot from your phone to send tasks
+4. Changes appear in your IDE in real-time
 
-```json
-{
-"agentEndpoint": "https://your-tunnel-or-localhost:4001",
-"models": [
-{ "id": "gemini-3-pro-high", "label": "Gemini 3 Pro High" },
-{ "id": "gemini-3-pro-low", "label": "Gemini 3 Pro Low" },
-{ "id": "claude-sonnet-4.5", "label": "Claude Sonnet 4.5" },
-{ "id": "claude-sonnet-4.5-thinking", "label": "Claude Sonnet 4.5 (Thinking)" },
-{ "id": "gpt-oss-120b", "label": "GPT OSS 120B (Medium)" }
-]
-}
+### Supported IDEs
+
+Any IDE that opens files from disk works with DevPilot:
+
+| IDE | Notes |
+|-----|-------|
+| VS Code | File changes appear via file watcher |
+| Cursor | Works seamlessly |
+| Windsurf | Full support |
+| Antigravity | Native integration path |
+| Neovim / Vim | Use `:e!` to reload files |
+| JetBrains | Enable "Synchronize files on frame activation" |
+
+---
+
+## Configuration
+
+### Environment Variables
+
+Create `.env` in the root:
+
+```env
+VITE_API_URL=http://localhost:8787
 ```
 
-Deploy:
+### Worker Config
+
+In `worker/wrangler.toml`:
+
+```toml
+[vars]
+AGENT_ENDPOINT = "http://localhost:4001"
+```
+
+For production, set this to your Cloudflare Tunnel or Tailscale URL.
+
+---
+
+## Deployment
+
+### Deploy Worker to Cloudflare
 
 ```bash
-cd devpilot-worker
-npm install
+cd worker
 npx wrangler deploy
 ```
 
-Connect the frontend to the Worker API via environment config.
+### Expose Local Agent
+
+Use Cloudflare Tunnel or Tailscale to make your agent reachable:
+
+```bash
+# Cloudflare Tunnel
+cloudflared tunnel --url http://localhost:4001
+
+# Or Tailscale
+tailscale serve 4001
+```
+
+Update `AGENT_ENDPOINT` in your Worker config to the tunnel URL.
 
 ---
 
-## Safety & Guardrails
+## Security
 
-- **Project allowlist:** Only configured project roots are accessible.
-- **Command allowlist:** Only specified commands per project can run.
-- **No direct filesystem from Cloudflare:** Cloud App can only call tools exposed by the Local Agent.
-- **Auth & rate limiting:** Tasks require authenticated users and are rate-limited.
-- **Logging & observability:** Log task actions (files edited, commands run) so you can review whatever happened while you were away.[web:140][web:149][web:163]
+- Project allowlist — only configured directories are accessible
+- Command allowlist — only specified commands per project can run
+- No direct cloud access — cloud Worker can only call exposed agent tools
+- Auth ready — add your own auth layer (Cloudflare Access, Auth0, etc.)
 
 ---
 
-## Roadmap
+## API Reference
 
-- Mobile-optimized UI (first-class phone UX).
-- Git diff view and one-click revert.
-- Multi-machine support (choose which agent/machine to use per task).
-- Optional integrations (Slack/Discord/WhatsApp) once the core phone-first web app is solid.
+### Worker Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/models | List available LLM models |
+| GET | /api/projects | List projects from agent |
+| POST | /api/tasks | Create a new task |
+| GET | /api/tasks/:id | Get task status |
+
+### Agent Tools
+
+| Tool | Description |
+|------|-------------|
+| list_files | List directory contents |
+| read_file | Read file content |
+| apply_patch | Create, update, or delete files |
+| run_command | Execute whitelisted commands |
+
+---
+
+## Contributing
+
+Contributions welcome.
+
+1. Fork the repo
+2. Create a feature branch
+3. Make your changes
+4. Submit a PR
 
 ---
 
 ## License
 
-TBD (MIT or similar).
+MIT License — see LICENSE for details.
+
+---
+
+Built with React, Vite, Tailwind CSS, Radix UI, Hono, and Go.
