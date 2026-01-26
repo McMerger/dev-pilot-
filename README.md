@@ -15,14 +15,14 @@ Works with any IDE: VS Code, Cursor, Windsurf, Antigravity, Neovim, JetBrains, o
 - **Bring your own AI** — use Gemini, Claude, GPT, or any LLM API
 - **Safe execution** — whitelisted commands, sandboxed file access, zero-trust design
 - **Real-time status updates** — live task progress and logs
-- **Edge-native architecture** — globally distributed, low-latency by design
+- **Edge-native architecture** — low-latency by design
 - **Stateless & horizontally scalable** — no single point of failure
 
 ---
 
 ## Architecture
 
-DevPilot uses a distributed edge-first architecture designed for planet-scale reliability and minimal latency.
+DevPilot uses a distributed edge-first architecture designed for reliability and minimal latency.
 
 ```
                            ┌─────────────────────────────────┐
@@ -265,4 +265,3 @@ MIT License — see LICENSE for details.
 ---
 
 Built with React, Vite, Tailwind CSS, Radix UI, Hono, and Go.  
-Engineered for the edge. Ready for the world.
