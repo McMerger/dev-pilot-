@@ -3,9 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
 [vars]
-AGENT_ENDPOINT = "http://localhost:4001"
+AGENT_ENDPOINT = "https://pin-annually-representatives-improvement.trycloudflare.com"
 
 [[kv_namespaces]]
 binding = "DEVPILOT_KV"
-id = "xxxx-xxxx-xxxx-xxxx" # Replace with real KV ID on deploy
+id = "e1564d2bb1504c88870ccd570aad7de1" # Real KV ID
 preview_id = "yyyy-yyyy-yyyy-yyyy"

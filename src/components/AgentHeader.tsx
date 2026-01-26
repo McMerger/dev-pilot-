@@ -20,8 +20,13 @@ export function AgentHeader({ selectedMode, onSelectMode, selectedModel, onSelec
     const [modelDropdown, setModelDropdown] = useState(false);
 
     useEffect(() => {
-        getModels().then(setModels).catch(console.error);
-    }, []);
+        getModels().then((data) => {
+            setModels(data);
+            if (data.length > 0 && !selectedModel) {
+                onSelectModel(data[0]);
+            }
+        }).catch(console.error);
+    }, [selectedModel, onSelectModel]);
 
     const currentMode = MODES.find((m) => m.id === selectedMode) || MODES[0];
     const ModeIcon = currentMode.icon;
