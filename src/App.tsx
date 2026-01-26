@@ -3,19 +3,75 @@ import { TopBar } from './components/TopBar';
 import { AgentHeader } from './components/AgentHeader';
 import { PromptArea } from './components/PromptArea';
 import { TaskList } from './components/TaskList';
-import { createTask, getTask, type Project, type Model, type Task } from './lib/api';
+import { Login } from './components/Login';
+import { ProjectGrid } from './components/ProjectGrid';
+import { createTask, getTask, getProjects, type Project, type Model, type Task } from './lib/api';
 
 import { useTheme } from './lib/theme';
 
 function App() {
+    // Auth State
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+    // App State
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+    const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
     const [selectedMode, setSelectedMode] = useState('planning');
     const [selectedModel, setSelectedModel] = useState<Model | null>(null);
-    const [tasks, setTasks] = useState<Task[]>([]);
+
+    // Task Persistence
+    const [tasks, setTasks] = useState<Task[]>(() => {
+        try {
+            const saved = localStorage.getItem('devpilot-tasks');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            console.error("Failed to parse tasks", e);
+            return [];
+        }
+    });
+
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Initialize theme management
+    // Theme
     const { theme, setTheme } = useTheme();
+
+    // Check for existing session
+    useEffect(() => {
+        const savedSession = localStorage.getItem('devpilot-session');
+        if (savedSession) {
+            setIsLoggedIn(true);
+        }
+    }, []);
+
+    // Persist tasks
+    useEffect(() => {
+        localStorage.setItem('devpilot-tasks', JSON.stringify(tasks));
+    }, [tasks]);
+
+    // Fetch projects when logged in
+    useEffect(() => {
+        if (isLoggedIn) {
+            getProjects().then(setAvailableProjects).catch(console.error);
+        }
+    }, [isLoggedIn]);
+
+    const handleLogin = () => {
+        setIsLoggedIn(true);
+        localStorage.setItem('devpilot-session', 'true');
+    };
+
+    const handleLogout = () => {
+        setIsLoggedIn(false);
+        setSelectedProject(null);
+        localStorage.removeItem('devpilot-session');
+    };
+
+    const handleClearHistory = () => {
+        if (confirm('Are you sure you want to clear all task history?')) {
+            setTasks([]);
+            localStorage.removeItem('devpilot-tasks');
+        }
+    };
 
     const handleSubmit = async (prompt: string) => {
         if (!selectedProject || !selectedModel) {
@@ -49,6 +105,11 @@ function App() {
         }
     };
 
+    // 1. Login Screen
+    if (!isLoggedIn) {
+        return <Login onLogin={handleLogin} />;
+    }
+
     return (
         <div className="flex flex-col h-[100dvh] bg-background text-foreground antialiased selection:bg-primary/20">
             <TopBar
@@ -56,20 +117,39 @@ function App() {
                 onSelectProject={setSelectedProject}
                 currentTheme={theme}
                 onSetTheme={setTheme}
+                onLogout={handleLogout}
+                onClearHistory={handleClearHistory}
             />
 
             <main className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
-                <div className="flex-none z-10 bg-background/80 backdrop-blur-xl border-b border-border/40 shadow-sm">
-                    <AgentHeader
-                        selectedMode={selectedMode}
-                        onSelectMode={setSelectedMode}
-                        selectedModel={selectedModel}
-                        onSelectModel={setSelectedModel}
+                {/* 2. Project Selection / Welcome Screen */}
+                {!selectedProject ? (
+                    <ProjectGrid
+                        projects={availableProjects}
+                        onSelect={setSelectedProject}
                     />
-                    <PromptArea onSubmit={handleSubmit} disabled={isSubmitting || !selectedProject || !selectedModel} />
-                </div>
+                ) : (
+                    <>
+                        {/* 3. Main Chat Interface */}
+                        {/* Header (Sticky Top) */}
+                        <div className="flex-none z-10 bg-background/80 backdrop-blur-xl border-b border-border/40 shadow-sm transition-all duration-200">
+                            <AgentHeader
+                                selectedMode={selectedMode}
+                                onSelectMode={setSelectedMode}
+                                selectedModel={selectedModel}
+                                onSelectModel={setSelectedModel}
+                            />
+                        </div>
 
-                <TaskList tasks={tasks} />
+                        {/* Task List (Scrollable Middle) */}
+                        <TaskList tasks={tasks} />
+
+                        {/* Input Area (Sticky Bottom) */}
+                        <div className="flex-none z-20 bg-background/80 backdrop-blur-xl border-t border-border/40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                            <PromptArea onSubmit={handleSubmit} disabled={isSubmitting || !selectedProject || !selectedModel} />
+                        </div>
+                    </>
+                )}
             </main>
         </div>
     );

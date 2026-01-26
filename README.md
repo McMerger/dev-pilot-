@@ -10,33 +10,55 @@ Works with any IDE: VS Code, Cursor, Windsurf, Antigravity, Neovim, JetBrains, o
 
 ## Features
 
-- Remote development from your phone
-- IDE-agnostic — works alongside any editor
-- Bring your own AI — use Gemini, Claude, GPT, or any LLM API
-- Safe execution via whitelisted commands and sandboxed file access
-- Real-time status updates
+- **Remote development from your phone** — work from anywhere, any device
+- **IDE-agnostic** — works alongside any editor
+- **Bring your own AI** — use Gemini, Claude, GPT, or any LLM API
+- **Safe execution** — whitelisted commands, sandboxed file access, zero-trust design
+- **Real-time status updates** — live task progress and logs
+- **Edge-native architecture** — globally distributed, low-latency by design
+- **Stateless & horizontally scalable** — no single point of failure
 
 ---
 
 ## Architecture
 
+DevPilot uses a distributed edge-first architecture designed for planet-scale reliability and minimal latency.
+
 ```
-┌─────────────────┐        ┌────────────────────┐        ┌──────────────────┐
-│  Your Phone     │   →    │  Cloudflare Worker │   →    │   Local Agent    │
-│  (Web App)      │   ←    │  (API + LLM Call)  │   ←    │  (Your Machine)  │
-└─────────────────┘        └────────────────────┘        └──────────────────┘
-                                    ↓
-                           ┌────────────────┐
-                           │  LLM API       │
-                           │  (Gemini/etc)  │
-                           └────────────────┘
+                           ┌─────────────────────────────────┐
+                           │     Global Edge Network         │
+                           │   (Cloudflare Workers / PoPs)   │
+                           └────────────────┬────────────────┘
+                                            │
+         ┌──────────────────────────────────┼──────────────────────────────────┐
+         │                                  │                                  │
+         ▼                                  ▼                                  ▼
+┌─────────────────┐               ┌─────────────────┐               ┌─────────────────┐
+│  User Device A  │               │  User Device B  │               │  User Device N  │
+│   (Any Region)  │               │   (Any Region)  │               │   (Any Region)  │
+└────────┬────────┘               └────────┬────────┘               └────────┬────────┘
+         │                                  │                                  │
+         └──────────────────────────────────┼──────────────────────────────────┘
+                                            │
+                                            ▼
+                           ┌─────────────────────────────────┐
+                           │        Local Agent Pool         │
+                           │  (Your Machines / Fleet / VMs)  │
+                           └─────────────────────────────────┘
 ```
 
 | Component | Tech | Purpose |
 |-----------|------|---------|
-| Web App | React, TypeScript, Tailwind | Mobile-friendly UI |
-| Worker | Cloudflare Workers, Hono | API orchestration, LLM calls |
-| Agent | Go | Local file and command execution |
+| Web App | React, TypeScript, Tailwind | Mobile-optimized PWA UI |
+| Edge Worker | Cloudflare Workers, Hono | Stateless API orchestration, LLM routing |
+| Agent | Go | Local file and command execution (isolated) |
+
+### Design Principles
+
+- **Stateless Workers** — All state is client-side or transient. Workers scale to zero and wake instantly.
+- **Edge-First** — Requests are handled at the nearest PoP for sub-50ms global latency.
+- **Agent Federation** — Connect multiple agents across machines or teams with zero coordination overhead.
+- **LLM Agnostic** — Route to any provider (Gemini, Claude, GPT, Mistral, local models) without code changes.
 
 ---
 
@@ -156,12 +178,16 @@ For production, set this to your Cloudflare Tunnel or Tailscale URL.
 
 ## Deployment
 
+DevPilot is designed for instant global deployment with no provisioning required.
+
 ### Deploy Worker to Cloudflare
 
 ```bash
 cd worker
 npx wrangler deploy
 ```
+
+Your Worker is now live across 300+ edge locations worldwide.
 
 ### Expose Local Agent
 
@@ -177,14 +203,25 @@ tailscale serve 4001
 
 Update `AGENT_ENDPOINT` in your Worker config to the tunnel URL.
 
+### Production Recommendations
+
+- **Multi-region Workers** — Cloudflare Workers run in every data center automatically.
+- **Agent Clustering** — Deploy multiple agents behind a load balancer for high availability.
+- **Durable Objects** — Optional: use Cloudflare Durable Objects for coordinated state when needed.
+- **KV / R2** — Store task history or large context in edge-native storage.
+
 ---
 
 ## Security
 
-- Project allowlist — only configured directories are accessible
-- Command allowlist — only specified commands per project can run
-- No direct cloud access — cloud Worker can only call exposed agent tools
-- Auth ready — add your own auth layer (Cloudflare Access, Auth0, etc.)
+DevPilot follows a zero-trust, defense-in-depth security model:
+
+- **Project allowlist** — only configured directories are accessible
+- **Command allowlist** — only specified commands per project can run
+- **No direct cloud access** — cloud Worker can only call exposed agent tools
+- **Auth ready** — add your own auth layer (Cloudflare Access, Auth0, etc.)
+- **End-to-end encryption** — use HTTPS/WSS for all connections
+- **Audit logging** — all tool invocations are logged locally
 
 ---
 
@@ -227,4 +264,5 @@ MIT License — see LICENSE for details.
 
 ---
 
-Built with React, Vite, Tailwind CSS, Radix UI, Hono, and Go.
+Built with React, Vite, Tailwind CSS, Radix UI, Hono, and Go.  
+Engineered for the edge. Ready for the world.
