@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Bot, ChevronDown, Sparkles, Zap } from 'lucide-react';
 import { getModels, type Model } from '../lib/api';
 

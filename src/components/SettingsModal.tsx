@@ -1,4 +1,4 @@
-import React from 'react';
+
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import { X, User, Palette, Laptop, Settings, Monitor } from 'lucide-react';

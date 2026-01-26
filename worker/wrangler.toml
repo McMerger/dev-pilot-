@@ -5,5 +5,7 @@ compatibility_date = "2024-01-01"
 [vars]
 AGENT_ENDPOINT = "http://localhost:4001"
 
-# Models available for selection
-# In production, you'd fetch this from a config or D1 database
+[[kv_namespaces]]
+binding = "DEVPILOT_KV"
+id = "xxxx-xxxx-xxxx-xxxx" # Replace with real KV ID on deploy
+preview_id = "yyyy-yyyy-yyyy-yyyy"

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Bot, ArrowRight, Github, Mail } from 'lucide-react';
+import { useState } from 'react';
+import { Bot, Github } from 'lucide-react';
 
 interface LoginProps {
     onLogin: () => void;
@@ -8,7 +8,7 @@ interface LoginProps {
 export function Login({ onLogin }: LoginProps) {
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = (provider: 'github' | 'google') => {
+    const handleLogin = () => {
         setIsLoading(true);
         // Simulate auth delay
         setTimeout(() => {
@@ -32,7 +32,7 @@ export function Login({ onLogin }: LoginProps) {
 
                 <div className="space-y-4 pt-4">
                     <button
-                        onClick={() => handleLogin('github')}
+                        onClick={() => handleLogin()}
                         disabled={isLoading}
                         className="w-full relative group overflow-hidden bg-foreground text-background hover:opacity-90 transition-all p-3 rounded-lg font-medium flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
                     >
@@ -47,7 +47,7 @@ export function Login({ onLogin }: LoginProps) {
                     </button>
 
                     <button
-                        onClick={() => handleLogin('google')}
+                        onClick={() => handleLogin()}
                         disabled={isLoading}
                         className="w-full bg-card hover:bg-accent/50 border border-border text-foreground transition-all p-3 rounded-lg font-medium flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
                     >

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { TopBar } from './components/TopBar';
 import { AgentHeader } from './components/AgentHeader';
 import { PromptArea } from './components/PromptArea';

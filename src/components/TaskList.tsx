@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { CheckCircle2, CircleDashed, XCircle, ChevronRight, Terminal } from 'lucide-react';
 import { cn } from '../lib/utils';

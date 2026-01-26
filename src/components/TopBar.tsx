@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, User } from 'lucide-react';
 import { getProjects, checkAgentHealth, type Project } from '../lib/api';
 import { type Theme } from '../lib/theme';
@@ -35,7 +35,7 @@ export function TopBar({ selectedProject, onSelectProject, currentTheme, onSetTh
         fetchData();
         const interval = setInterval(fetchData, 10000);
         return () => clearInterval(interval);
-    }, []);
+    }, [selectedProject, onSelectProject]);
 
     return (
         <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">

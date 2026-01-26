@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { FolderGit2, Plus, ArrowRight } from 'lucide-react';
 import { type Project } from '../lib/api';
 

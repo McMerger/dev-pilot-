@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { X, HelpCircle, Laptop } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 

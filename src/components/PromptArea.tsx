@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ArrowUp, Paperclip, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import * as Dialog from '@radix-ui/react-dialog';
