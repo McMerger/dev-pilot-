@@ -40,7 +40,7 @@ export function AgentHeader({ selectedMode, onSelectMode, selectedModel, onSelec
                 <h1 className="text-xl font-semibold tracking-tight">DevPilot</h1>
             </div>
 
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="flex items-center gap-2 flex-wrap">
                 {/* Mode Selector */}
                 <div className="relative">
                     <button

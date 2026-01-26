@@ -132,7 +132,7 @@ function App() {
                     <>
                         {/* 3. Main Chat Interface */}
                         {/* Header (Sticky Top) */}
-                        <div className="flex-none z-10 bg-background/80 backdrop-blur-xl border-b border-border/40 shadow-sm transition-all duration-200">
+                        <div className="flex-none z-30 bg-background/80 backdrop-blur-xl border-b border-border/40 shadow-sm transition-all duration-200">
                             <AgentHeader
                                 selectedMode={selectedMode}
                                 onSelectMode={setSelectedMode}

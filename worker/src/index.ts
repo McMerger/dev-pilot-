@@ -344,15 +344,20 @@ app.post('/api/tasks', async (c) => {
 
     await storage.saveTask(task);
 
-    setTimeout(async () => {
-        const t = await storage.getTask(task.id);
-        if (t) {
-            t.status = 'done';
-            t.resultSummary = `Task completed by ${body.modelId}.`;
-            t.updatedAt = new Date().toISOString();
-            await storage.saveTask(t);
-        }
-    }, 4000);
+    c.executionCtx.waitUntil(
+        new Promise<void>((resolve) => {
+            setTimeout(async () => {
+                const t = await storage.getTask(task.id);
+                if (t) {
+                    t.status = 'done';
+                    t.resultSummary = `Task completed by ${body.modelId}.`;
+                    t.updatedAt = new Date().toISOString();
+                    await storage.saveTask(t);
+                }
+                resolve();
+            }, 4000);
+        })
+    );
 
     return c.json(task, 201);
 });
