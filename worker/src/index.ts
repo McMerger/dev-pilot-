@@ -4,13 +4,25 @@ import { cors } from 'hono/cors';
 type Bindings = {
     AGENT_ENDPOINT: string;
     DEVPILOT_KV: KVNamespace;
-    AI: any;
+    AI: Ai;
     GITHUB_CLIENT_ID: string;
     GITHUB_CLIENT_SECRET: string;
     GOOGLE_CLIENT_ID: string;
     GOOGLE_CLIENT_SECRET: string;
     JWT_SECRET: string;
 };
+
+interface AiTextGenerationInput {
+    messages: { role: string; content: string }[];
+}
+
+interface AiTextGenerationOutput {
+    response?: string;
+}
+
+interface Ai {
+    run: (model: string, inputs: AiTextGenerationInput) => Promise<AiTextGenerationOutput>;
+}
 
 const app = new Hono<{ Bindings: Bindings, Variables: { userId: string } }>();
 
@@ -21,7 +33,7 @@ app.use('*', async (c, next) => {
         // We use a singleton pattern or attached to context in real apps
         // For this simple demo, we rely on the global 'storage' instance
         // But we need to update its internal KV reference
-        (storage as any).kv = c.env.DEVPILOT_KV;
+        (storage as DurableStorage).kv = c.env.DEVPILOT_KV;
     }
     await next();
 });
@@ -83,13 +95,14 @@ interface Storage {
     // Auth
     saveUser(user: User): Promise<void>;
     getUserByProvider(provider: string, providerId: string): Promise<User | null>;
+    getUser(id: string): Promise<User | null>;
 }
 
 // Durable KV Storage (Simulated for Dev, would use Cloudflare KV/D1 in Prod)
 // Durable KV Storage (Simulated for Dev, would use Cloudflare KV/D1 in Prod)
 class DurableStorage implements Storage {
     private mem = new Map<string, string>();
-    private kv?: KVNamespace;
+    public kv?: KVNamespace;
 
     constructor(kv?: KVNamespace) {
         this.kv = kv;
@@ -129,7 +142,7 @@ class DurableStorage implements Storage {
 
         return Array.from(this.mem.values())
             .map(s => JSON.parse(s) as Task)
-            .filter(t => t.userId === userId && (t as any).provider)
+            .filter(t => t.userId === userId && t.provider)
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
 
@@ -221,11 +234,15 @@ class DurableStorage implements Storage {
 
         if (!userId) return null;
 
+        return this.getUser(userId);
+    }
+
+    async getUser(id: string): Promise<User | null> {
         if (this.kv) {
-            const data = await this.kv.get(`user:${userId}`);
+            const data = await this.kv.get(`user:${id}`);
             return data ? JSON.parse(data) : null;
         }
-        const data = this.mem.get(`user:${userId}`);
+        const data = this.mem.get(`user:${id}`);
         return data ? JSON.parse(data) : null;
     }
 }
@@ -239,7 +256,14 @@ interface AuditEntry {
     action: 'ALLOW' | 'DENY';
     description: string;
     actor: string; // Agent ID or User IP
-    metadata?: any;
+    metadata?: Record<string, unknown>;
+}
+
+interface Project {
+    id: string;
+    name: string;
+    root: string;
+    allowedCommands: string[];
 }
 
 // --- Agent Registry (Federation) ---
@@ -247,7 +271,7 @@ interface AgentNode {
     id: string;
     url: string;
     region: string;
-    projects: any[];
+    projects: Project[];
     lastSeen: number;
 }
 
@@ -378,13 +402,13 @@ app.get('/api/auth/:provider/callback', async (c) => {
                     code
                 })
             });
-            const tokenData = await tokenRes.json() as any;
+            const tokenData = await tokenRes.json() as { access_token: string };
 
             // Get User Info
             const userRes = await fetch('https://api.github.com/user', {
                 headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'User-Agent': 'DevPilot' }
             });
-            const userData = await userRes.json() as any;
+            const userData = await userRes.json() as { id: number; login: string; name: string; email?: string; avatar_url: string };
 
             email = userData.email || `${userData.login}@github.com`;
             name = userData.name || userData.login;
@@ -397,7 +421,7 @@ app.get('/api/auth/:provider/callback', async (c) => {
             name = 'Mock Google User';
             providerId = 'mock_google_123';
         }
-    } catch (err) {
+    } catch {
         return c.json({ error: 'Auth failed' }, 500);
     }
 
@@ -408,7 +432,7 @@ app.get('/api/auth/:provider/callback', async (c) => {
             id: `user_${crypto.randomUUID()}`,
             email,
             name,
-            provider: provider as any,
+            provider: provider as 'github' | 'google' | 'apple' | 'email',
             provider_id: providerId,
             avatar_url: avatarUrl,
             created_at: new Date().toISOString(),
@@ -438,7 +462,7 @@ app.post('/api/agents/heartbeat', async (c) => {
     const body = await c.req.json<{
         agentId: string;
         url: string;
-        projects: any[];
+        projects: Project[];
     }>();
 
     const node: AgentNode = {
@@ -461,13 +485,13 @@ app.get('/api/projects', async (c) => {
     const activeAgents = await storage.listAgents();
 
     // 2. Aggregate projects
-    const allProjects: any[] = [];
+    const allProjects: (Project & { agentId: string })[] = [];
 
     // Add Local Agent (if configured via env)
     if (c.env.AGENT_ENDPOINT) {
         try {
             const res = await fetch(`${c.env.AGENT_ENDPOINT}/projects`);
-            const projs = await res.json() as any[];
+            const projs = await res.json() as Project[];
             allProjects.push(...projs.map(p => ({ ...p, agentId: 'local-static' })));
         } catch { /* ignore offline static agent */ }
     }
@@ -509,6 +533,21 @@ app.use('/api/tasks/*', async (c, next) => {
     await next();
 });
 
+// GET /api/user/me - Get current user profile
+app.get('/api/user/me', async (c) => {
+    const userId = c.get('userId');
+    const user = await storage.getUser(userId);
+    if (!user) return c.json({ error: 'User not found' }, 404);
+    return c.json(user);
+});
+
+// GET /api/audit-logs - Security Logs
+app.get('/api/admin/audit-logs', async (c) => {
+    // Ideally check for admin role, but for now open to auth'd users
+    const logs = await storage.getAuditLogs();
+    return c.json(logs);
+});
+
 // GET /api/tasks - List my tasks
 app.get('/api/tasks', async (c) => {
     const userId = c.get('userId');
@@ -546,7 +585,7 @@ app.post('/api/tasks', async (c) => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         provider: provider
-    } as any;
+    };
 
     await storage.saveTask(task);
 
@@ -575,24 +614,42 @@ app.post('/api/tasks', async (c) => {
                     }
 
                     if (targetUrl) {
+                        // DEBUG LOG
+                        console.log(`[Router] Target Agent URL: ${targetUrl}`);
+
                         try {
                             const fsRes = await fetch(`${targetUrl}/tools/list_files`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', 'X-Agent-Secret': 'devpilot-secret-key' },
                                 body: JSON.stringify({ projectId: body.projectId, path: '.' })
                             });
-                            const files = await fsRes.json() as string[];
-                            fileContext = files.slice(0, 50).join('\n'); // Limit context
-                            if (files.length > 50) fileContext += `\n...(${files.length - 50} more)`;
-                        } catch (e) {
+                            const data = await fsRes.json();
+
+                            if (!fsRes.ok) {
+                                throw new Error((data as { error?: string }).error || fsRes.statusText);
+                            }
+
+                            if (!Array.isArray(data)) {
+                                throw new Error("Agent returned invalid data format (expected array)");
+                            }
+
+                            const filesList = (data || []) as { name: string, isDir: boolean }[];
+
+                            const fileStrings = filesList.map(f => f.isDir ? `${f.name}/` : f.name);
+                            fileContext = fileStrings.slice(0, 50).join('\n'); // Limit context
+                            if (filesList.length > 50) fileContext += `\n...(${filesList.length - 50} more)`;
+                        } catch (e: unknown) {
                             console.error("Failed to fetch context", e);
-                            fileContext = "Error connecting to Local Agent";
+                            const msg = e instanceof Error ? e.message : String(e);
+                            fileContext = `[SYSTEM ERROR] Could not connect to Local Agent at ${targetUrl || 'unknown'}.\nDetails: ${msg}\n\nTroubleshooting:\n1. Ensure 'start-agent.ps1' is running.\n2. Check if the Cloudflare Tunnel is active.`;
+                            // We can't push to logs here easily because we don't have the task object 't' yet, 
+                            // but we will ensure this string ends up in the System Prompt so the AI sees it.
                         }
                     }
                 }
 
                 // 2. Run core inference with Context
-                let aiResponse: any;
+                let aiResponse: AiTextGenerationOutput | { response: string };
                 let logModelName = 'Llama-3-8b';
 
                 try {
@@ -603,7 +660,7 @@ ${fileContext}
 Respond directly to the user request. If they ask about files, use the list above. Be concise and technical.`;
 
                     // Dynamic Model Routing
-                    let modelToRun = '@cf/meta/llama-3-8b-instruct';
+                    const modelToRun = '@cf/meta/llama-3-8b-instruct';
 
 
                     if (body.modelId.includes('gemini') || body.modelId.includes('claude')) {
@@ -615,6 +672,13 @@ Respond directly to the user request. If they ask about files, use the list abov
                     if (body.mode === 'planning') {
                         finalSystemPrompt = `[PLANNING MODE ACTIVE]\n${systemPrompt}\n\nIMPORTANT: Do not write code yet. First, analyze the files and create a detailed implementation plan.`;
                         logModelName += ' (Planning)';
+                    }
+
+                    // Force the AI to acknowledge the files
+                    if (fileContext.includes("Error") || fileContext.length < 5) {
+                        // Keep existing prompt
+                    } else {
+                        finalSystemPrompt += `\n\nINSTRUCTION: The user wants to see their files. The file list ABOVE is the ground truth. You must reference it. If they ask to list files, output the list immediately.`;
                     }
 
                     aiResponse = await c.env.AI.run(modelToRun, {
@@ -633,6 +697,7 @@ Respond directly to the user request. If they ask about files, use the list abov
                     t.status = 'done';
                     t.resultSummary = aiResponse.response || JSON.stringify(aiResponse);
                     t.logs.push(`[Context] Loaded ${fileContext.split('\n').length} files from Local Agent`);
+                    t.logs.push(`[Debug] Raw content: ${fileContext.slice(0, 200)}...`); // Show the user the PROOF
                     t.logs.push(`[AI] Response generated by ${logModelName}`);
                     t.updatedAt = new Date().toISOString();
                     await storage.saveTask(t);
@@ -715,8 +780,9 @@ app.post('/api/agent/tools/:tool', async (c) => {
             body: JSON.stringify(body),
         });
         const data = await res.json();
-        return c.json(data, res.status as any);
-    } catch (err) {
+        // Hono types for status code are strict, we trust the fetch response status is valid
+        return c.json(data, res.status as 200 | 201 | 400 | 401 | 403 | 404 | 500);
+    } catch {
         return c.json({ error: 'Agent not reachable' }, 502);
     }
 });

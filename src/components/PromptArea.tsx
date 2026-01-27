@@ -6,9 +6,11 @@ import * as Dialog from '@radix-ui/react-dialog';
 interface PromptAreaProps {
     onSubmit: (prompt: string) => void;
     disabled?: boolean;
+    onFocus?: () => void;
+    onBlur?: () => void;
 }
 
-export function PromptArea({ onSubmit, disabled }: PromptAreaProps) {
+export function PromptArea({ onSubmit, disabled, onFocus, onBlur }: PromptAreaProps) {
     const [input, setInput] = useState('');
     const [contextOpen, setContextOpen] = useState(false);
 
@@ -25,6 +27,8 @@ export function PromptArea({ onSubmit, disabled }: PromptAreaProps) {
                 <textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
@@ -32,15 +36,15 @@ export function PromptArea({ onSubmit, disabled }: PromptAreaProps) {
                         }
                     }}
                     placeholder="Type a task..."
-                    className="w-full bg-transparent border-none text-sm p-3 min-h-[80px] max-h-[40vh] resize-none focus:outline-none placeholder:text-muted-foreground/70 custom-scrollbar"
+                    className="w-full bg-transparent border-none text-base md:text-sm p-3 md:p-4 min-h-[60px] md:min-h-[80px] max-h-[40vh] resize-none focus:outline-none placeholder:text-muted-foreground/70 custom-scrollbar"
                     disabled={disabled}
                 />
 
                 <div className="flex items-center justify-between p-2 border-t border-border/50 bg-muted/20 rounded-b-2xl">
                     <Dialog.Root open={contextOpen} onOpenChange={setContextOpen}>
                         <Dialog.Trigger asChild>
-                            <button className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-background/50" title="Add File Context">
-                                <Paperclip className="w-4 h-4" />
+                            <button className="p-3 md:p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl md:rounded-md hover:bg-background/50 active:scale-95 touch-manipulation" title="Add File Context">
+                                <Paperclip className="w-5 h-5 md:w-4 md:h-4" />
                             </button>
                         </Dialog.Trigger>
                         <Dialog.Portal>
@@ -94,14 +98,14 @@ export function PromptArea({ onSubmit, disabled }: PromptAreaProps) {
                     <button
                         onClick={handleSubmit}
                         className={cn(
-                            "p-2 rounded-xl transition-all duration-200",
+                            "p-3 md:p-2 rounded-xl transition-all duration-200 active:scale-95 touch-manipulation",
                             input.trim() && !disabled
                                 ? "bg-primary text-primary-foreground shadow-md hover:opacity-90 scale-100"
                                 : "bg-muted text-muted-foreground cursor-not-allowed opacity-50 scale-95"
                         )}
                         disabled={!input.trim() || disabled}
                     >
-                        <ArrowUp className="w-4 h-4" />
+                        <ArrowUp className="w-5 h-5 md:w-4 md:h-4" />
                     </button>
                 </div>
             </div>

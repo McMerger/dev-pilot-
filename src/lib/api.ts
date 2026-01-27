@@ -85,11 +85,42 @@ export async function getTask(id: string): Promise<Task> {
     return fetchWithAuth(`/api/tasks/${id}`);
 }
 
-export async function checkAgentHealth(): Promise<boolean> {
+export async function checkAgentHealth(): Promise<{ online: boolean; region: string }> {
     try {
-        await fetchWithAuth('/api/projects');
-        return true;
+        const token = localStorage.getItem('devpilot-session');
+        const headers = {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        };
+        const res = await fetch(`${API_BASE}/api/projects`, { headers });
+        const region = res.headers.get('X-Edge-Region') || 'Unknown';
+        if (res.ok) return { online: true, region };
+        return { online: false, region: 'Offline' };
     } catch {
-        return false;
+        return { online: false, region: 'Offline' };
     }
+}
+
+export interface User {
+    id: string;
+    email: string;
+    name: string;
+    avatar_url?: string;
+    provider: string;
+}
+
+export interface AuditEntry {
+    id: string;
+    timestamp: string;
+    action: 'ALLOW' | 'DENY';
+    description: string;
+    actor: string;
+}
+
+export async function getCurrentUser(): Promise<User> {
+    return fetchWithAuth('/api/user/me');
+}
+
+export async function getAuditLogs(): Promise<AuditEntry[]> {
+    return fetchWithAuth('/api/admin/audit-logs');
 }

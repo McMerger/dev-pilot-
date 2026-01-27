@@ -48,7 +48,7 @@ export function HelpModal() {
                         </div>
 
                         <div className="pt-2 text-xs text-muted-foreground text-center">
-                            DevPilot connects via Local Agent (Port 4001)
+                            DevPilot connects via Local Agent
                         </div>
                     </div>
                 </Dialog.Content>

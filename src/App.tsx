@@ -12,8 +12,10 @@ import { useTheme } from './lib/theme';
 function App() {
     // Auth State
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [isInputFocused, setIsInputFocused] = useState(false);
 
     // App State
+    const [user, setUser] = useState<any>(null); // Real User Type imported from api later if needed to be strict
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
     const [selectedMode, setSelectedMode] = useState(localStorage.getItem('devpilot-mode') || 'planning');
@@ -52,8 +54,11 @@ function App() {
     // Fetch data when logged in
     useEffect(() => {
         if (isLoggedIn) {
-            getProjects().then(setAvailableProjects).catch(console.error);
-            getTasks().then(setTasks).catch(console.error);
+            import('./lib/api').then(api => {
+                api.getCurrentUser().then(setUser).catch(console.error);
+                api.getProjects().then(setAvailableProjects).catch(console.error);
+                api.getTasks().then(setTasks).catch(console.error);
+            });
         }
     }, [isLoggedIn]);
 
@@ -132,6 +137,7 @@ function App() {
                 onSetTheme={setTheme}
                 onLogout={handleLogout}
                 onClearHistory={handleClearHistory}
+                user={user}
             />
 
             <main className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
@@ -145,7 +151,7 @@ function App() {
                     <>
                         {/* 3. Main Chat Interface */}
                         {/* Header (Sticky Top) */}
-                        <div className="flex-none z-30 bg-background/80 backdrop-blur-xl border-b border-border/40 shadow-sm transition-all duration-200">
+                        <div className={`flex-none z-30 bg-background/80 backdrop-blur-xl border-b border-border/40 shadow-sm transition-all duration-300 ${isInputFocused ? 'hidden md:block' : 'block'}`}>
                             <AgentHeader
                                 selectedMode={selectedMode}
                                 onSelectMode={setSelectedMode}
@@ -158,8 +164,13 @@ function App() {
                         <TaskList tasks={tasks} />
 
                         {/* Input Area (Sticky Bottom) */}
-                        <div className="flex-none z-20 bg-background/80 backdrop-blur-xl border-t border-border/40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-                            <PromptArea onSubmit={handleSubmit} disabled={isSubmitting || !selectedProject || !selectedModel} />
+                        <div className="flex-none z-20 bg-background/80 backdrop-blur-xl border-t border-border/40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] pb-safe">
+                            <PromptArea
+                                onSubmit={handleSubmit}
+                                disabled={isSubmitting || !selectedProject || !selectedModel}
+                                onFocus={() => setIsInputFocused(true)}
+                                onBlur={() => setIsInputFocused(false)}
+                            />
                         </div>
                     </>
                 )}

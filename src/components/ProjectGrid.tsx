@@ -47,7 +47,9 @@ export function ProjectGrid({ projects, onSelect }: ProjectGridProps) {
                             </button>
                         ))}
 
-                        <div className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-border/50 rounded-xl text-muted-foreground hover:bg-accent/20 hover:border-primary/30 hover:text-primary transition-all cursor-pointer">
+                        <div
+                            onClick={() => alert("To add a new project:\n\n1. Open your 'agent.config.json' file\n2. Add your project path to the 'projects' list\n3. Restart the agent script")}
+                            className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-border/50 rounded-xl text-muted-foreground hover:bg-accent/20 hover:border-primary/30 hover:text-primary transition-all cursor-pointer">
                             <Plus className="w-8 h-8 mb-2 opacity-50" />
                             <span className="text-sm font-medium">Add to Config</span>
                         </div>

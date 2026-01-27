@@ -48,7 +48,7 @@ DevPilot uses a distributed edge-first architecture designed for reliability and
 ```
 
 | Component | Tech | Purpose |
-|-----------|------|---------|
+|---|---|---|
 | Web App | React, TypeScript, Tailwind | Mobile-optimized PWA UI |
 | Edge Worker | Cloudflare Workers, Hono | Stateless API orchestration, LLM routing |
 | Agent | Go | Local file and command execution (isolated) |
@@ -110,7 +110,11 @@ Edit `agent/agent.config.json` to add your projects:
 Terminal 1 — Go Agent:
 
 ```bash
-cd agent && go run .
+# Windows
+.\start-agent.ps1
+
+# Linux / macOS
+./start-agent.sh
 ```
 
 Terminal 2 — Cloudflare Worker (local dev):

@@ -2,8 +2,21 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "🚀 Starting DevPilot Local Bridge..." -ForegroundColor Cyan
 
-# 0. Clean up previous valid artifacts
-if (Test-Path "tunnel.log") { Remove-Item "tunnel.log" }
+# 0. Self-Healing: Kill Zombies on Port 4001
+try {
+    $zombie = Get-NetTCPConnection -LocalPort 4001 -ErrorAction SilentlyContinue
+    if ($zombie) {
+        Write-Host "   > Found zombie process (PID $($zombie.OwningProcess)) on port 4001. Killing..." -ForegroundColor Yellow
+        Stop-Process -Id $zombie.OwningProcess -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    }
+}
+catch {}
+
+# 0b. Clean up previous artifacts
+if (Test-Path "tunnel.log") { 
+    try { Remove-Item "tunnel.log" -Force -ErrorAction SilentlyContinue } catch {}
+}
 
 # 1. Start Cloudflare Tunnel
 Write-Host "   > Initializing Secure Tunnel..." -ForegroundColor Gray
@@ -43,19 +56,8 @@ Write-Host "   > Connecting Agent to Cloud Brain..." -ForegroundColor Gray
 Write-Host "   > (Press Ctrl+C to stop)" -ForegroundColor DarkGray
 
 try {
-    # Verify we have Go
-    go version | Out-Null
-}
-catch {
-    Write-Error "Go is not installed or not in PATH."
-    Stop-Process -Id $tunnelProcess.Id -Force
-    exit 1
-}
-
-try {
-    # Run the agent, passing the URL as appropriate
-    # Note: We assume main.go accepts the URL as arg[1] based on my previous edits
-    go run . $url
+    # Run the compiled agent
+    .\devpilot-agent.exe $url
 }
 finally {
     Write-Host "`n🛑 Shutting down..." -ForegroundColor Red

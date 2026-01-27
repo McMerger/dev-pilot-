@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { CheckCircle2, CircleDashed, XCircle, ChevronRight, Terminal } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -35,13 +35,21 @@ function formatTime(dateStr: string) {
 
 export function TaskList({ tasks }: TaskListProps) {
     const [expandedTask, setExpandedTask] = useState<string | null>(null);
+    const bottomRef = useRef<HTMLDivElement>(null);
+
+    // Auto-scroll to bottom when tasks change
+    useEffect(() => {
+        if (tasks.length > 0) {
+            bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [tasks.length]);
 
     const toggleTask = (id: string) => {
         setExpandedTask(expandedTask === id ? null : id);
     };
 
     return (
-        <div className="flex-1 overflow-y-auto min-h-0 bg-background/50">
+        <div className="flex-1 overflow-y-auto min-h-0 bg-background/50 overscroll-contain">
             <div className="sticky top-0 px-4 py-2 bg-background/95 backdrop-blur-sm border-b border-border/50 text-xs font-medium text-muted-foreground z-10 flex justify-between items-center">
                 <span>Recent Activity</span>
                 <span className="text-muted-foreground/50">{tasks.length} tasks</span>
@@ -65,7 +73,7 @@ export function TaskList({ tasks }: TaskListProps) {
                                 )}
                             >
                                 <div
-                                    className="p-4 cursor-pointer flex items-start gap-3"
+                                    className="p-3 md:p-4 cursor-pointer flex items-start gap-3 touch-manipulation"
                                     onClick={() => toggleTask(task.id)}
                                 >
                                     <div className="mt-0.5 shrink-0 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
@@ -129,8 +137,10 @@ export function TaskList({ tasks }: TaskListProps) {
                             </div>
                         );
                     })}
+                    <div ref={bottomRef} />
                 </div>
             )}
         </div>
     );
 }
+

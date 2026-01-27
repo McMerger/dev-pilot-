@@ -139,5 +139,30 @@
 @layer base {
     body {
         @apply antialiased overflow-hidden;
+        touch-action: manipulation;
+        overscroll-behavior-y: none;
+        /* Prevent pull-to-refresh/bounce on body */
+    }
+
+    /* Prevent iOS zoom on inputs */
+    input,
+    textarea,
+    select {
+        @apply text-base md:text-sm;
+    }
+
+    /* Safe Area Utilities */
+    /* Safe Area Utilities */
+    .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .pt-safe {
+        padding-top: env(safe-area-inset-top);
+    }
+
+    .select-none {
+        -webkit-user-select: none;
+        user-select: none;
     }
 }

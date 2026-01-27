@@ -38,8 +38,11 @@ func ListFilesHandler(cfg *Config) http.HandlerFunc {
 			return
 		}
 
-		targetPath := filepath.Join(project.Root, req.Path)
-		if !strings.HasPrefix(targetPath, project.Root) {
+		// Normalize paths for Windows compatibility
+		cleanRoot := filepath.Clean(project.Root)
+		targetPath := filepath.Clean(filepath.Join(project.Root, req.Path))
+
+		if !strings.HasPrefix(targetPath, cleanRoot) {
 			http.Error(w, `{"error":"path traversal not allowed"}`, http.StatusForbidden)
 			return
 		}
@@ -94,8 +97,11 @@ func ReadFileHandler(cfg *Config) http.HandlerFunc {
 			return
 		}
 
-		targetPath := filepath.Join(project.Root, req.Path)
-		if !strings.HasPrefix(targetPath, project.Root) {
+		// Normalize paths
+		cleanRoot := filepath.Clean(project.Root)
+		targetPath := filepath.Clean(filepath.Join(project.Root, req.Path))
+
+		if !strings.HasPrefix(targetPath, cleanRoot) {
 			http.Error(w, `{"error":"path traversal not allowed"}`, http.StatusForbidden)
 			return
 		}
@@ -147,8 +153,11 @@ func ApplyPatchHandler(cfg *Config) http.HandlerFunc {
 		applied := 0
 
 		for _, op := range req.Operations {
-			targetPath := filepath.Join(project.Root, op.Path)
-			if !strings.HasPrefix(targetPath, project.Root) {
+			// Normalize paths
+			cleanRoot := filepath.Clean(project.Root)
+			targetPath := filepath.Clean(filepath.Join(project.Root, op.Path))
+
+			if !strings.HasPrefix(targetPath, cleanRoot) {
 				errors = append(errors, "path traversal not allowed: "+op.Path)
 				continue
 			}

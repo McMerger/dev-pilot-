@@ -14,7 +14,14 @@
                 "npm run lint",
                 "npm run build",
                 "npm run dev",
-                "go test ./..."
+                "go test ./...",
+                "git status",
+                "git add",
+                "git commit",
+                "git push",
+                "git pull",
+                "git log",
+                "git diff"
             ]
         },
         {

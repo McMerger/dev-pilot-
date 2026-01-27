@@ -32,12 +32,12 @@ export function AgentHeader({ selectedMode, onSelectMode, selectedModel, onSelec
     const ModeIcon = currentMode.icon;
 
     return (
-        <div className="px-4 py-4 pt-6 flex flex-col gap-4">
+        <div className="p-3 md:p-4 flex flex-col gap-3 md:gap-4">
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                    <Bot className="w-6 h-6" />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <Bot className="w-5 h-5 md:w-6 md:h-6" />
                 </div>
-                <h1 className="text-xl font-semibold tracking-tight">DevPilot</h1>
+                <h1 className="text-lg md:text-xl font-semibold tracking-tight">DevPilot</h1>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
@@ -45,7 +45,7 @@ export function AgentHeader({ selectedMode, onSelectMode, selectedModel, onSelec
                 <div className="relative">
                     <button
                         onClick={() => setModeDropdown(!modeDropdown)}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card text-xs font-medium hover:border-primary/50 transition-colors whitespace-nowrap"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card text-xs font-medium hover:border-primary/50 transition-colors whitespace-nowrap touch-manipulation"
                     >
                         <ModeIcon className="w-3.5 h-3.5 text-amber-400" />
                         <span>{currentMode.label} Mode</span>

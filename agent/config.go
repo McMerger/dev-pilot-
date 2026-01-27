@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"strings"
 )
 
 type Config struct {
@@ -47,10 +48,10 @@ func (c *Config) GetProject(id string) *Project {
 	return nil
 }
 
-// IsCommandAllowed checks if a command is in the project's allowlist
+// IsCommandAllowed checks if a command starts with an entry in the project's allowlist
 func (p *Project) IsCommandAllowed(cmd string) bool {
 	for _, allowed := range p.AllowedCommands {
-		if allowed == cmd {
+		if strings.HasPrefix(cmd, allowed) {
 			return true
 		}
 	}

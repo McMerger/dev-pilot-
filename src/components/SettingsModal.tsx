@@ -12,9 +12,11 @@ interface SettingsModalProps {
     onLogout?: () => void;
     currentProject?: { name: string; root: string; allowedCommands: string[] } | null;
     onClearHistory?: () => void;
+    edgeStatus?: { online: boolean; region: string };
+    user?: any;
 }
 
-export function SettingsModal({ currentTheme, onSetTheme, open, onOpenChange, onLogout, currentProject, onClearHistory }: SettingsModalProps) {
+export function SettingsModal({ currentTheme, onSetTheme, open, onOpenChange, onLogout, currentProject, onClearHistory, edgeStatus, user }: SettingsModalProps) {
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             <Dialog.Portal>
@@ -58,12 +60,16 @@ export function SettingsModal({ currentTheme, onSetTheme, open, onOpenChange, on
                                 <div>
                                     <h3 className="text-sm font-medium mb-1">User Profile</h3>
                                     <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border/50">
-                                        <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-primary-foreground font-bold text-lg">
-                                            DP
-                                        </div>
+                                        {user?.avatar_url ? (
+                                            <img src={user.avatar_url} alt={user.name} className="w-12 h-12 rounded-full object-cover border border-border" />
+                                        ) : (
+                                            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-primary-foreground font-bold text-lg">
+                                                {user?.name?.[0]?.toUpperCase() || 'U'}
+                                            </div>
+                                        )}
                                         <div>
-                                            <div className="font-medium">DevPilot User</div>
-                                            <div className="text-xs text-muted-foreground">user_demo@devpilot.local</div>
+                                            <div className="font-medium">{user?.name || 'Guest User'}</div>
+                                            <div className="text-xs text-muted-foreground">{user?.email || 'Not logged in'}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -201,37 +207,36 @@ export function SettingsModal({ currentTheme, onSetTheme, open, onOpenChange, on
                                             <span className="font-medium text-sm">Agent Federation</span>
                                             <span className="text-xs text-muted-foreground">Global Agent Pool</span>
                                         </div>
-                                        <span className="text-xs px-2 py-1 bg-emerald-500/20 text-emerald-500 rounded font-medium flex items-center gap-1">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                            Healthy
+                                        <span className={`text-xs px-2 py-1 rounded font-medium flex items-center gap-1 ${edgeStatus?.online ? 'bg-emerald-500/20 text-emerald-500' : 'bg-red-500/20 text-red-500'}`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${edgeStatus?.online ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                                            {edgeStatus?.online ? 'Healthy' : 'Offline'}
                                         </span>
                                     </div>
 
                                     <div className="space-y-2 pt-2 border-t border-border/50">
                                         <div className="flex justify-between items-center text-xs">
                                             <span className="text-muted-foreground">Connected Region</span>
-                                            <span className="font-mono">us-east-1 (IAD)</span>
+                                            <span className="font-mono">{edgeStatus?.online ? edgeStatus.region : 'Disconnected'}</span>
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs">
-                                            <span className="text-muted-foreground">Latency</span>
-                                            <div className="flex-1 h-1.5 bg-muted/50 rounded-full overflow-hidden">
-                                                <div className="h-full w-[15%] bg-emerald-500 rounded-full" />
+                                        {edgeStatus?.online && (
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <span className="text-muted-foreground">Latency</span>
+                                                <div className="flex-1 h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                                                    <div className="h-full w-[85%] bg-emerald-500 rounded-full" />
+                                                </div>
+                                                <span className="font-mono">&lt;50ms</span>
                                             </div>
-                                            <span className="font-mono">12ms</span>
-                                        </div>
+                                        )}
                                         <div className="flex justify-between items-center text-xs">
                                             <span className="text-muted-foreground">Active Agents</span>
-                                            <span className="font-mono">3 / 5</span>
+                                            <span className="font-mono">{edgeStatus?.online ? '1 / 1' : '0 / 0'}</span>
                                         </div>
                                     </div>
 
                                     <div className="pt-2 border-t border-border/50">
                                         <div className="text-[10px] uppercase font-semibold text-muted-foreground mb-2">Security Audit Log</div>
-                                        <div className="bg-black/40 rounded border border-border/50 p-2 h-24 overflow-y-auto font-mono text-[10px] space-y-1">
-                                            <div className="text-emerald-500">[12:42:01] ALLOW: read_file "src/App.tsx" (Agent-01)</div>
-                                            <div className="text-emerald-500">[12:42:05] ALLOW: run_command "npm run test" (Agent-01)</div>
-                                            <div className="text-red-500">[12:43:12] DENY: run_command "rm -rf /" (Policy: RootProtect)</div>
-                                            <div className="text-emerald-500">[12:44:00] ALLOW: list_files "components/" (Agent-02)</div>
+                                        <div className="bg-black/40 rounded border border-border/50 p-2 h-24 overflow-y-auto font-mono text-[10px] space-y-1 flex items-center justify-center text-muted-foreground/50 italic">
+                                            No recent audit events
                                         </div>
                                     </div>
 
@@ -240,17 +245,10 @@ export function SettingsModal({ currentTheme, onSetTheme, open, onOpenChange, on
                                         <div className="space-y-1">
                                             <div className="flex items-center justify-between text-xs">
                                                 <span className="flex items-center gap-2">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                                                    dev-machine-01 (Local)
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${edgeStatus?.online ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
+                                                    local-agent-01 ({edgeStatus?.online ? 'Active' : 'Missing'})
                                                 </span>
-                                                <span className="text-muted-foreground">Active</span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-xs opacity-60">
-                                                <span className="flex items-center gap-2">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                                    dev-machine-02
-                                                </span>
-                                                <span className="text-muted-foreground">Idle</span>
+                                                <span className="text-muted-foreground">{edgeStatus?.online ? 'Ready' : 'Unknown'}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -259,7 +257,7 @@ export function SettingsModal({ currentTheme, onSetTheme, open, onOpenChange, on
                         </div>
                     </Tabs.Root>
                 </Dialog.Content>
-            </Dialog.Portal>
-        </Dialog.Root>
+            </Dialog.Portal >
+        </Dialog.Root >
     );
 }
