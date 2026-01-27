@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -43,52 +44,68 @@ func main() {
 	handler := auditMiddleware(mux, cfg.AgentID)
 	handler = corsMiddleware(handler)
 
+	// Get Public URL from Args (provided by startup script)
+	publicUrl := fmt.Sprintf("http://%s:%d", cfg.Listen.Host, cfg.Listen.Port)
+	if len(os.Args) > 1 {
+		publicUrl = os.Args[1]
+	}
+	log.Printf("Agent Public URL: %s", publicUrl)
+
 	// Start Heartbeat Loop
-	go startHeartbeat(cfg)
+	go startHeartbeatWithUrl(cfg, publicUrl)
 
 	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
 
-func startHeartbeat(cfg *Config) {
-	// In prod, this URL comes from flags or env
-	workerURL := "http://localhost:8787/api/agents/heartbeat"
+// Improved Heartbeat with dynamic URL support
+func startHeartbeatWithUrl(cfg *Config, publicUrl string) {
+	workerURL := "https://devpilot-worker.cortesmailles01.workers.dev/api/agents/heartbeat"
 
-	// Payload
-	type HeartbeatReq struct {
-		AgentID  string    `json:"agentId"`
+	ticker := time.NewTicker(30 * time.Second)
+	// Send immediate first heatbeat
+	go func() {
+		sendHeartbeat(workerURL, publicUrl, cfg)
+	}()
+
+	for range ticker.C {
+		sendHeartbeat(workerURL, publicUrl, cfg)
+	}
+}
+
+func sendHeartbeat(workerURL, publicUrl string, cfg *Config) {
+	type AgentNode struct {
+		ID       string    `json:"agentId"`
 		URL      string    `json:"url"`
 		Projects []Project `json:"projects"`
 	}
 
-	ticker := time.NewTicker(30 * time.Second)
-	for ; true; <-ticker.C {
-		// Assume agent is reachable at localhost:4001 for now (or tunnel URL)
-		reqBody := HeartbeatReq{
-			AgentID:  cfg.AgentID,
-			URL:      fmt.Sprintf("http://%s:%d", cfg.Listen.Host, cfg.Listen.Port),
-			Projects: cfg.Projects,
-		}
-
-		data, _ := json.Marshal(reqBody)
-		req, err := http.NewRequest("POST", workerURL, bytes.NewBuffer(data))
-		if err != nil {
-			log.Printf("Failed to create request: %v", err)
-			continue
-		}
-
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Agent-Secret", "devpilot-secret-key") // Auth
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Printf("Heartbeat failed: %v", err)
-			continue
-		}
-		resp.Body.Close()
-		log.Printf("Heartbeat sent to Cluster. Status: %s", resp.Status)
+	reqBody := AgentNode{
+		ID:       cfg.AgentID,
+		URL:      publicUrl,
+		Projects: cfg.Projects,
 	}
+
+	data, _ := json.Marshal(reqBody)
+	req, err := http.NewRequest("POST", workerURL, bytes.NewBuffer(data))
+	if err != nil {
+		log.Printf("Failed to create request: %v", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	// In a real app, this would be a secure token exchanged at startup
+	req.Header.Set("X-Agent-Secret", "devpilot-secret-key")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("Heartbeat failed: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	log.Printf("Heartbeat sent to Brain (%s). Status: %s", workerURL, resp.Status)
 }
 
 // corsMiddleware adds CORS headers for development

@@ -16,8 +16,11 @@ function App() {
     // App State
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
-    const [selectedMode, setSelectedMode] = useState('planning');
-    const [selectedModel, setSelectedModel] = useState<Model | null>(null);
+    const [selectedMode, setSelectedMode] = useState(localStorage.getItem('devpilot-mode') || 'planning');
+    const [selectedModel, setSelectedModel] = useState<Model | null>(() => {
+        const saved = localStorage.getItem('devpilot-model');
+        return saved ? JSON.parse(saved) : null;
+    });
 
     // Task Persistence
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -53,6 +56,17 @@ function App() {
             getTasks().then(setTasks).catch(console.error);
         }
     }, [isLoggedIn]);
+
+    // Persist UI State
+    useEffect(() => {
+        localStorage.setItem('devpilot-mode', selectedMode);
+    }, [selectedMode]);
+
+    useEffect(() => {
+        if (selectedModel) {
+            localStorage.setItem('devpilot-model', JSON.stringify(selectedModel));
+        }
+    }, [selectedModel]);
 
     const handleLogin = () => {
         setIsLoggedIn(true);
