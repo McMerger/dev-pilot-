@@ -5,7 +5,7 @@ import { PromptArea } from './components/PromptArea';
 import { TaskList } from './components/TaskList';
 import { Login } from './components/Login';
 import { ProjectGrid } from './components/ProjectGrid';
-import { createTask, getTask, type Project, type Model, type Task } from './lib/api';
+import { createTask, getTask, type Project, type Model, type Task, type User } from './lib/api';
 
 import { useTheme } from './lib/theme';
 
@@ -15,7 +15,7 @@ function App() {
     const [isInputFocused, setIsInputFocused] = useState(false);
 
     // App State
-    const [user, setUser] = useState<any>(null); // Real User Type imported from api later if needed to be strict
+    const [user, setUser] = useState<User | null>(null); // Real User Type imported from api later if needed to be strict
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
     const [selectedMode, setSelectedMode] = useState(localStorage.getItem('devpilot-mode') || 'planning');
