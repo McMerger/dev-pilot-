@@ -151,7 +151,7 @@ function App() {
                     <>
                         {/* 3. Main Chat Interface */}
                         {/* Header (Sticky Top) */}
-                        <div className={`flex-none z-30 bg-background/80 backdrop-blur-xl border-b border-border/40 shadow-sm transition-all duration-300 ${isInputFocused ? 'hidden md:block' : 'block'}`}>
+                        <div className={`flex-none z-30 bg-background/80 backdrop-blur-xl border-b border-border/40 shadow-sm transition-all duration-300 ease-in-out ${isInputFocused ? 'hidden md:block opacity-0 -translate-y-full md:opacity-100 md:translate-y-0' : 'block opacity-100 translate-y-0'}`}>
                             <AgentHeader
                                 selectedMode={selectedMode}
                                 onSelectMode={setSelectedMode}

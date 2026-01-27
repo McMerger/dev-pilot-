@@ -2,13 +2,33 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
+
+// SafePathJoin ensures the joined path stays within the root
+func SafePathJoin(root, subpath string) (string, error) {
+	cleanRoot := filepath.Clean(root)
+	targetPath := filepath.Clean(filepath.Join(root, subpath))
+
+	// Use Rel to check containment (robust for Windows)
+	rel, err := filepath.Rel(cleanRoot, targetPath)
+	if err != nil {
+		return "", err
+	}
+	// ".." check ensures we didn't traverse up
+	if strings.HasPrefix(rel, "..") || rel == ".." || strings.HasPrefix(rel, "/") || strings.HasPrefix(rel, "\\") {
+		return "", fmt.Errorf("path traversal: %s", subpath)
+	}
+
+	return targetPath, nil
+}
 
 // --- List Files ---
 
@@ -38,14 +58,14 @@ func ListFilesHandler(cfg *Config) http.HandlerFunc {
 			return
 		}
 
-		// Normalize paths for Windows compatibility
-		cleanRoot := filepath.Clean(project.Root)
-		targetPath := filepath.Clean(filepath.Join(project.Root, req.Path))
-
-		if !strings.HasPrefix(targetPath, cleanRoot) {
+		// Secure Path
+		targetPath, err := SafePathJoin(project.Root, req.Path)
+		if err != nil {
+			log.Printf("[ListFiles] Blocked path %s: %v", req.Path, err)
 			http.Error(w, `{"error":"path traversal not allowed"}`, http.StatusForbidden)
 			return
 		}
+		log.Printf("[ListFiles] Listing %s", targetPath)
 
 		entries, err := os.ReadDir(targetPath)
 		if err != nil {
@@ -97,14 +117,14 @@ func ReadFileHandler(cfg *Config) http.HandlerFunc {
 			return
 		}
 
-		// Normalize paths
-		cleanRoot := filepath.Clean(project.Root)
-		targetPath := filepath.Clean(filepath.Join(project.Root, req.Path))
-
-		if !strings.HasPrefix(targetPath, cleanRoot) {
+		// Secure Path
+		targetPath, err := SafePathJoin(project.Root, req.Path)
+		if err != nil {
+			log.Printf("[ReadFile] Blocked path %s: %v", req.Path, err)
 			http.Error(w, `{"error":"path traversal not allowed"}`, http.StatusForbidden)
 			return
 		}
+		log.Printf("[ReadFile] Reading %s", targetPath)
 
 		content, err := os.ReadFile(targetPath)
 		if err != nil {
@@ -153,14 +173,13 @@ func ApplyPatchHandler(cfg *Config) http.HandlerFunc {
 		applied := 0
 
 		for _, op := range req.Operations {
-			// Normalize paths
-			cleanRoot := filepath.Clean(project.Root)
-			targetPath := filepath.Clean(filepath.Join(project.Root, op.Path))
-
-			if !strings.HasPrefix(targetPath, cleanRoot) {
+			targetPath, err := SafePathJoin(project.Root, op.Path)
+			if err != nil {
+				log.Printf("[ApplyPatch] Blocked path %s: %v", op.Path, err)
 				errors = append(errors, "path traversal not allowed: "+op.Path)
 				continue
 			}
+			log.Printf("[ApplyPatch] Writing to %s", targetPath)
 
 			switch op.Op {
 			case "create", "update":

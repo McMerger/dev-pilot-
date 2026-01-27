@@ -17,7 +17,7 @@ export function ProjectGrid({ projects, onSelect }: ProjectGridProps) {
                 </div>
 
                 {projects.length === 0 ? (
-                    <div className="text-center py-20 border-2 border-dashed border-border/50 rounded-xl bg-muted/5">
+                    <div className="text-center py-20 border-2 border-dashed border-border/50 rounded-xl bg-muted/5 animate-in fade-in zoom-in-95 duration-500">
                         <FolderGit2 className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
                         <h3 className="text-lg font-medium mb-2">No projects found</h3>
                         <p className="text-sm text-muted-foreground max-w-xs mx-auto mb-6">
@@ -26,11 +26,12 @@ export function ProjectGrid({ projects, onSelect }: ProjectGridProps) {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {projects.map((project) => (
+                        {projects.map((project, index) => (
                             <button
                                 key={project.id}
                                 onClick={() => onSelect(project)}
-                                className="group relative flex flex-col items-start p-5 h-auto bg-card hover:bg-accent/40 border border-border rounded-xl text-left transition-all hover:shadow-md hover:-translate-y-1"
+                                style={{ animationDelay: `${index * 50}ms` }}
+                                className="group relative flex flex-col items-start p-5 h-auto bg-card hover:bg-accent/40 border border-border rounded-xl text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 active:scale-95 active:shadow-sm animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards"
                             >
                                 <div className="p-2.5 bg-primary/10 text-primary rounded-lg mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                                     <FolderGit2 className="w-6 h-6" />

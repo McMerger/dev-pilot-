@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowUp, Paperclip, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import * as Dialog from '@radix-ui/react-dialog';
+import { VoiceInput } from './VoiceInput';
 
 interface PromptAreaProps {
     onSubmit: (prompt: string) => void;
@@ -47,6 +48,12 @@ export function PromptArea({ onSubmit, disabled, onFocus, onBlur }: PromptAreaPr
                                 <Paperclip className="w-5 h-5 md:w-4 md:h-4" />
                             </button>
                         </Dialog.Trigger>
+                        <div className="mx-1">
+                            <VoiceInput
+                                onResult={(text) => setInput(prev => prev + (prev ? ' ' : '') + text)}
+                                disabled={disabled}
+                            />
+                        </div>
                         <Dialog.Portal>
                             <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-opacity" />
                             <Dialog.Content className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-[90vw] max-w-sm bg-card border border-border rounded-lg shadow-2xl z-50 p-6">

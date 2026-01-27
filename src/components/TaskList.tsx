@@ -36,12 +36,14 @@ function formatTime(dateStr: string) {
 export function TaskList({ tasks }: TaskListProps) {
     const [expandedTask, setExpandedTask] = useState<string | null>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
+    const prevTasksLength = useRef(0);
 
     // Auto-scroll to bottom when tasks change
     useEffect(() => {
-        if (tasks.length > 0) {
+        if (tasks.length > prevTasksLength.current) {
             bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
+        prevTasksLength.current = tasks.length;
     }, [tasks.length]);
 
     const toggleTask = (id: string) => {
@@ -67,13 +69,14 @@ export function TaskList({ tasks }: TaskListProps) {
                         return (
                             <div
                                 key={task.id}
+                                style={{ animationDelay: `${tasks.length - 1 === tasks.indexOf(task) ? '100ms' : '0ms'}` }}
                                 className={cn(
-                                    "border-b border-border/50 transition-colors",
+                                    "border-b border-border/50 transition-colors animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards duration-300",
                                     isExpanded ? "bg-accent/10" : "hover:bg-accent/20"
                                 )}
                             >
                                 <div
-                                    className="p-3 md:p-4 cursor-pointer flex items-start gap-3 touch-manipulation"
+                                    className="p-3 md:p-4 cursor-pointer flex items-start gap-3 touch-manipulation select-none active:bg-accent/30 transition-colors"
                                     onClick={() => toggleTask(task.id)}
                                 >
                                     <div className="mt-0.5 shrink-0 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>

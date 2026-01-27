@@ -648,57 +648,173 @@ app.post('/api/tasks', async (c) => {
                     }
                 }
 
-                // 2. Run core inference with Context
-                let aiResponse: AiTextGenerationOutput | { response: string };
-                let logModelName = 'Llama-3-8b';
+                // 2. Run Agentic Loop (ReAct)
+                const MAX_STEPS = 5;
+                let currentStep = 0;
+                let finalResponse = "";
+                const messageHistory = [
+                    {
+                        role: 'system',
+                        content: `You are DevPilot, an advanced coding agent connected to the user's local filesystem.
 
-                try {
-                    const systemPrompt = `You are DevPilot, an advanced coding agent connected to the user's local filesystem.
-Current Project Files:
-${fileContext}
+AVAILABLE TOOLS:
+1. read_file(path: string): Reads file content.
+2. write_to_file(path: string, content: string): Creates or overwrites a file.
+3. run_command(command: string): Runs a shell command.
+4. list_files(path: string): Lists directory contents.
 
-Respond directly to the user request. If they ask about files, use the list above. Be concise and technical.`;
+FORMAT:
+To use a tool, you must output a SINGLE JSON object in this exact format and NOTHING else:
+{ "tool": "read_file", "args": { "path": "src/App.tsx" } }
 
-                    // Dynamic Model Routing
-                    const modelToRun = '@cf/meta/llama-3-8b-instruct';
+To speak to the user (final answer), output standard text (not JSON).
 
+CURRENT PROJECT CONTEXT:
+${fileContext}`
+                    },
+                    { role: 'user', content: body.prompt }
+                ];
 
-                    if (body.modelId.includes('gemini') || body.modelId.includes('claude')) {
-                        logModelName = `${body.modelId} (Simulated via Llama-3)`;
+                while (currentStep < MAX_STEPS) {
+                    console.log(`[Agent] Step ${currentStep + 1}/${MAX_STEPS}`);
+
+                    // Call LLM
+                    const aiRes = await c.env.AI.run('@cf/meta/llama-3-8b-instruct', { messages: messageHistory });
+                    const aiText = typeof aiRes === 'string' ? aiRes : (aiRes as { response: string }).response;
+
+                    // Log AI Act
+                    const stepLog = `[Step ${currentStep + 1}] AI: ${aiText.slice(0, 100)}...`;
+                    const t_update = await storage.getTask(task.id);
+                    if (t_update) {
+                        t_update.logs.push(stepLog);
+                        await storage.saveTask(t_update);
                     }
 
-                    // Mode Logic
-                    let finalSystemPrompt = systemPrompt;
-                    if (body.mode === 'planning') {
-                        finalSystemPrompt = `[PLANNING MODE ACTIVE]\n${systemPrompt}\n\nIMPORTANT: Do not write code yet. First, analyze the files and create a detailed implementation plan.`;
-                        logModelName += ' (Planning)';
+                    // Parse Tool Call
+                    let toolCall = null;
+                    try {
+                        // Strict specific regex for {"tool": ...}
+                        const jsonMatch = aiText.match(/{\s*"tool":\s*"[^"]+",\s*"args":\s*{[\s\S]*?}\s*}/);
+                        if (jsonMatch) {
+                            toolCall = JSON.parse(jsonMatch[0]);
+                        } else {
+                            // Fallback for markdown blocks
+                            const looseMatch = aiText.match(/\{[\s\S]*\}/);
+                            if (looseMatch && looseMatch[0].includes('"tool"')) {
+                                toolCall = JSON.parse(looseMatch[0]);
+                            }
+                        }
+                    } catch (e) {
+                        console.log("Failed to parse tool call:", e);
                     }
 
-                    // Force the AI to acknowledge the files
-                    if (fileContext.includes("Error") || fileContext.length < 5) {
-                        // Keep existing prompt
+                    if (toolCall && toolCall.tool && toolCall.args) {
+                        console.log(`[Agent] Tool Call: ${toolCall.tool}`);
+                        const t_tool = await storage.getTask(task.id);
+                        if (t_tool) {
+                            t_tool.logs.push(`[Tool] Executing ${toolCall.tool}...`);
+                            await storage.saveTask(t_tool);
+                        }
+
+                        messageHistory.push({ role: 'assistant', content: JSON.stringify(toolCall) });
+
+                        let toolResult = "";
+                        let targetUrl = null;
+
+                        // Resolve Agent URL again (redundant but safe)
+                        if (body.projectId) {
+                            const agents = await storage.listAgents();
+                            for (const node of agents) {
+                                if (node.projects.some(p => p.id === body.projectId)) {
+                                    targetUrl = node.url;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!targetUrl) {
+                            toolResult = "Error: Agent disconnected or project not found. Make sure the local agent is running.";
+                            // Log failure
+                            const t_err = await storage.getTask(task.id);
+                            if (t_err) {
+                                t_err.logs.push(`[Error] Agent not found for project ${body.projectId}`);
+                                await storage.saveTask(t_err);
+                            }
+                        } else {
+                            try {
+                                const secret = 'devpilot-secret-key';
+                                let res: Response | null = null;
+                                const headers = { 'Content-Type': 'application/json', 'X-Agent-Secret': secret };
+
+                                if (toolCall.tool === 'read_file') {
+                                    res = await fetch(`${targetUrl}/tools/read_file`, {
+                                        method: 'POST',
+                                        headers,
+                                        body: JSON.stringify({ projectId: body.projectId, path: toolCall.args.path })
+                                    });
+                                }
+                                else if (toolCall.tool === 'write_to_file') {
+                                    res = await fetch(`${targetUrl}/tools/apply_patch`, {
+                                        method: 'POST',
+                                        headers,
+                                        body: JSON.stringify({
+                                            projectId: body.projectId,
+                                            operations: [{ op: 'create', path: toolCall.args.path, content: toolCall.args.content }]
+                                        })
+                                    });
+                                }
+                                else if (toolCall.tool === 'run_command') {
+                                    res = await fetch(`${targetUrl}/tools/run_command`, {
+                                        method: 'POST',
+                                        headers,
+                                        body: JSON.stringify({ projectId: body.projectId, command: toolCall.args.command })
+                                    });
+                                }
+                                else if (toolCall.tool === 'list_files') {
+                                    res = await fetch(`${targetUrl}/tools/list_files`, {
+                                        method: 'POST',
+                                        headers,
+                                        body: JSON.stringify({ projectId: body.projectId, path: toolCall.args.path || '.' })
+                                    });
+                                }
+                                else {
+                                    toolResult = "Error: Unknown tool.";
+                                }
+
+                                if (res) {
+                                    if (!res.ok) {
+                                        const errText = await res.text();
+                                        toolResult = `Agent Error (${res.status}): ${errText}`;
+                                    } else {
+                                        const data = await res.json();
+                                        if (toolCall.tool === 'read_file') toolResult = (data as any).content || "Empty";
+                                        else if (toolCall.tool === 'write_to_file') toolResult = (data as any).errors?.length ? `Errors: ${(data as any).errors}` : "Success";
+                                        else if (toolCall.tool === 'run_command') toolResult = `Exit: ${(data as any).exitCode}\n${(data as any).stdout}`;
+                                        else toolResult = JSON.stringify(data).slice(0, 1000);
+                                    }
+                                }
+                            } catch (e) {
+                                toolResult = `Error executing tool: ${e}`;
+                            }
+                        }
+
+                        // Feed back result
+                        messageHistory.push({ role: 'user', content: `[TOOL OUTPUT]: ${toolResult.slice(0, 2000)}` });
+                        currentStep++;
                     } else {
-                        finalSystemPrompt += `\n\nINSTRUCTION: The user wants to see their files. The file list ABOVE is the ground truth. You must reference it. If they ask to list files, output the list immediately.`;
+                        // No tool call -> Final Answer
+                        finalResponse = aiText;
+                        break;
                     }
-
-                    aiResponse = await c.env.AI.run(modelToRun, {
-                        messages: [
-                            { role: 'system', content: finalSystemPrompt },
-                            { role: 'user', content: body.prompt }
-                        ]
-                    });
-                } catch (e) {
-                    console.error("AI Error", e);
-                    aiResponse = { response: "Error running AI model. Please ensure the prompt is valid." };
                 }
+
+                if (!finalResponse) finalResponse = "Task timed out or reached max steps.";
 
                 const t = await storage.getTask(task.id);
                 if (t) {
                     t.status = 'done';
-                    t.resultSummary = aiResponse.response || JSON.stringify(aiResponse);
-                    t.logs.push(`[Context] Loaded ${fileContext.split('\n').length} files from Local Agent`);
-                    t.logs.push(`[Debug] Raw content: ${fileContext.slice(0, 200)}...`); // Show the user the PROOF
-                    t.logs.push(`[AI] Response generated by ${logModelName}`);
+                    t.resultSummary = finalResponse;
+                    t.logs.push(`[Done] Agent finished in ${currentStep} steps.`);
                     t.updatedAt = new Date().toISOString();
                     await storage.saveTask(t);
                 }
