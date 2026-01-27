@@ -5,7 +5,7 @@ import { PromptArea } from './components/PromptArea';
 import { TaskList } from './components/TaskList';
 import { Login } from './components/Login';
 import { ProjectGrid } from './components/ProjectGrid';
-import { createTask, getTask, getProjects, getTasks, type Project, type Model, type Task } from './lib/api';
+import { createTask, getTask, type Project, type Model, type Task } from './lib/api';
 
 import { useTheme } from './lib/theme';
 
