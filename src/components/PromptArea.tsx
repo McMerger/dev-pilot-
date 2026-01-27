@@ -32,7 +32,7 @@ export function PromptArea({ onSubmit, disabled }: PromptAreaProps) {
                         }
                     }}
                     placeholder="Type a task..."
-                    className="w-full bg-transparent border-none text-sm p-4 min-h-[120px] resize-none focus:outline-none placeholder:text-muted-foreground/70"
+                    className="w-full bg-transparent border-none text-sm p-3 min-h-[80px] max-h-[40vh] resize-none focus:outline-none placeholder:text-muted-foreground/70 custom-scrollbar"
                     disabled={disabled}
                 />
 

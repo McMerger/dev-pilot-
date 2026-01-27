@@ -16,6 +16,12 @@
                 "npm run dev",
                 "go test ./..."
             ]
+        },
+        {
+            "id": "proj_root",
+            "name": "Local Drive (E:)",
+            "root": "E:/",
+            "allowedCommands": []
         }
     ]
 }

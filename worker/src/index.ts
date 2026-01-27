@@ -5,9 +5,14 @@ type Bindings = {
     AGENT_ENDPOINT: string;
     DEVPILOT_KV: KVNamespace;
     AI: any;
+    GITHUB_CLIENT_ID: string;
+    GITHUB_CLIENT_SECRET: string;
+    GOOGLE_CLIENT_ID: string;
+    GOOGLE_CLIENT_SECRET: string;
+    JWT_SECRET: string;
 };
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<{ Bindings: Bindings, Variables: { userId: string } }>();
 
 // Inject Storage with KV if available
 app.use('*', async (c, next) => {
@@ -39,6 +44,17 @@ const MODELS = [
 
 // --- Types ---
 
+interface User {
+    id: string;
+    email: string;
+    name: string;
+    avatar_url?: string;
+    provider: 'github' | 'google' | 'apple' | 'email';
+    provider_id: string;
+    created_at: string;
+    last_login: string;
+}
+
 interface Task {
     id: string;
     userId: string;
@@ -64,6 +80,9 @@ interface Storage {
     // Security
     addAuditLog(entry: AuditEntry): Promise<void>;
     getAuditLogs(): Promise<AuditEntry[]>;
+    // Auth
+    saveUser(user: User): Promise<void>;
+    getUserByProvider(provider: string, providerId: string): Promise<User | null>;
 }
 
 // Durable KV Storage (Simulated for Dev, would use Cloudflare KV/D1 in Prod)
@@ -92,11 +111,26 @@ class DurableStorage implements Storage {
     }
 
     async listTasks(userId: string): Promise<Task[]> {
-        // KV listing is complex (requires keys() cursor), for now we stick to Map for list
-        // In real prod we'd use D1 or a separate index
+        if (this.kv) {
+            // inefficient scan for prototype
+            const keys = await this.kv.list({ prefix: 'task:' });
+            const tasks: Task[] = [];
+            for (const key of keys.keys) {
+                const val = await this.kv.get(key.name);
+                if (val) {
+                    const t = JSON.parse(val) as Task;
+                    if (t.userId === userId) {
+                        tasks.push(t);
+                    }
+                }
+            }
+            return tasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        }
+
         return Array.from(this.mem.values())
             .map(s => JSON.parse(s) as Task)
-            .filter(t => t.userId === userId && (t as any).provider);
+            .filter(t => t.userId === userId && (t as any).provider)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
 
     // Stateless Registry Implementation
@@ -163,6 +197,36 @@ class DurableStorage implements Storage {
         }
         const raw = this.mem.get(key);
         return raw ? JSON.parse(raw) : [];
+    }
+
+    // Auth Implementation
+    async saveUser(user: User): Promise<void> {
+        // Index by ID
+        const val = JSON.stringify(user);
+        if (this.kv) await this.kv.put(`user:${user.id}`, val);
+        else this.mem.set(`user:${user.id}`, val);
+
+        // Index by Provider (for lookup during login)
+        const indexKey = `user_idx:${user.provider}:${user.provider_id}`;
+        if (this.kv) await this.kv.put(indexKey, user.id);
+        else this.mem.set(indexKey, user.id);
+    }
+
+    async getUserByProvider(provider: string, providerId: string): Promise<User | null> {
+        const indexKey = `user_idx:${provider}:${providerId}`;
+        let userId: string | null | undefined;
+
+        if (this.kv) userId = await this.kv.get(indexKey);
+        else userId = this.mem.get(indexKey);
+
+        if (!userId) return null;
+
+        if (this.kv) {
+            const data = await this.kv.get(`user:${userId}`);
+            return data ? JSON.parse(data) : null;
+        }
+        const data = this.mem.get(`user:${userId}`);
+        return data ? JSON.parse(data) : null;
     }
 }
 
@@ -237,8 +301,131 @@ app.use('*', async (c, next) => {
         return c.json({ error: 'Unauthorized Agent' }, 401);
     }
 
+    // ... existing auth middleware ...
     c.header('X-Edge-Region', 'IAD');
     await next();
+});
+
+// --- Auth Utilities ---
+
+async function signJWT(user: User, secret: string) {
+    const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const payload = btoa(JSON.stringify({ sub: user.id, name: user.name, exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) }));
+    const signature = btoa(await crypto.subtle.sign('HMAC', await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']), new TextEncoder().encode(`${header}.${payload}`)).then(buf => String.fromCharCode(...new Uint8Array(buf))));
+    return `${header}.${payload}.${signature.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
+}
+
+async function verifyJWT(token: string, secret: string) {
+    try {
+        const [header, payload, signature] = token.split('.');
+        if (!header || !payload || !signature) return null;
+
+        const signedInput = `${header}.${payload}`;
+        const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+
+        const sigBase64 = signature.replace(/-/g, '+').replace(/_/g, '/');
+        const sigBuf = Uint8Array.from(atob(sigBase64), c => c.charCodeAt(0));
+
+        const isValid = await crypto.subtle.verify('HMAC', key, sigBuf, new TextEncoder().encode(signedInput));
+        if (!isValid) return null;
+
+        const data = JSON.parse(atob(payload));
+        if (data.exp && Date.now() / 1000 > data.exp) return null;
+
+        return data;
+    } catch {
+        return null;
+    }
+}
+
+// --- Auth Routes ---
+
+app.get('/api/auth/:provider', (c) => {
+    const provider = c.req.param('provider');
+    const { GITHUB_CLIENT_ID, GOOGLE_CLIENT_ID } = c.env;
+
+    if (provider === 'github') {
+        const url = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=user:email`;
+        return c.redirect(url);
+    }
+    if (provider === 'google') {
+        const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${c.req.url}/callback&response_type=code&scope=email profile`;
+        return c.redirect(url);
+    }
+    return c.json({ error: 'Provider not supported' }, 400);
+});
+
+app.get('/api/auth/:provider/callback', async (c) => {
+    const provider = c.req.param('provider');
+    const code = c.req.query('code');
+
+    if (!code) return c.json({ error: 'No code provided' }, 400);
+
+    let email = '';
+    let name = '';
+    let providerId = '';
+    let avatarUrl = '';
+
+    try {
+        if (provider === 'github') {
+            // Exchange code for token
+            const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({
+                    client_id: c.env.GITHUB_CLIENT_ID,
+                    client_secret: c.env.GITHUB_CLIENT_SECRET,
+                    code
+                })
+            });
+            const tokenData = await tokenRes.json() as any;
+
+            // Get User Info
+            const userRes = await fetch('https://api.github.com/user', {
+                headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'User-Agent': 'DevPilot' }
+            });
+            const userData = await userRes.json() as any;
+
+            email = userData.email || `${userData.login}@github.com`;
+            name = userData.name || userData.login;
+            providerId = String(userData.id);
+            avatarUrl = userData.avatar_url;
+        }
+        else if (provider === 'google') {
+            // Mock Google for now as it requires complex setup
+            email = 'mock@gmail.com';
+            name = 'Mock Google User';
+            providerId = 'mock_google_123';
+        }
+    } catch (err) {
+        return c.json({ error: 'Auth failed' }, 500);
+    }
+
+    // Upsert User
+    let user = await storage.getUserByProvider(provider, providerId);
+    if (!user) {
+        user = {
+            id: `user_${crypto.randomUUID()}`,
+            email,
+            name,
+            provider: provider as any,
+            provider_id: providerId,
+            avatar_url: avatarUrl,
+            created_at: new Date().toISOString(),
+            last_login: new Date().toISOString()
+        };
+    } else {
+        user.last_login = new Date().toISOString();
+        if (avatarUrl) user.avatar_url = avatarUrl;
+    }
+
+    await storage.saveUser(user);
+
+    // Issue JWT
+    const token = await signJWT(user, c.env.JWT_SECRET || 'dev-secret');
+
+    // Redirect to Frontend
+    return c.redirect(`https://dev-pilot.pages.dev?token=${token}`);
 });
 
 // GET /api/models
@@ -304,8 +491,34 @@ app.get('/api/projects', async (c) => {
     return c.json(allProjects);
 });
 
+// --- Protected Routes Middleware ---
+
+app.use('/api/tasks/*', async (c, next) => {
+    const auth = c.req.header('Authorization');
+    if (!auth || !auth.startsWith('Bearer ')) {
+        return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const token = auth.split(' ')[1];
+    const payload = await verifyJWT(token, c.env.JWT_SECRET || 'dev-secret');
+    if (!payload) {
+        return c.json({ error: 'Invalid Token' }, 401);
+    }
+
+    c.set('userId', payload.sub);
+    await next();
+});
+
+// GET /api/tasks - List my tasks
+app.get('/api/tasks', async (c) => {
+    const userId = c.get('userId');
+    const tasks = await storage.listTasks(userId);
+    return c.json(tasks);
+});
+
 // POST /api/tasks - create a new task with LLM Routing
 app.post('/api/tasks', async (c) => {
+    const userId = c.get('userId');
     const body = await c.req.json<{
         projectId: string;
         prompt: string;
@@ -322,7 +535,7 @@ app.post('/api/tasks', async (c) => {
 
     const task: Task = {
         id: `task_${crypto.randomUUID().slice(0, 8)}`,
-        userId: 'user_demo',
+        userId: userId,
         projectId: body.projectId,
         prompt: body.prompt,
         mode: body.mode,
@@ -381,11 +594,16 @@ app.post('/api/tasks', async (c) => {
 
 // GET /api/tasks/:id
 app.get('/api/tasks/:id', async (c) => {
+    const userId = c.get('userId');
     const id = c.req.param('id');
     const task = await storage.getTask(id);
 
     if (!task) {
         return c.json({ error: 'Task not found' }, 404);
+    }
+
+    if (task.userId !== userId) {
+        return c.json({ error: 'Unauthorized' }, 403);
     }
 
     return c.json(task);

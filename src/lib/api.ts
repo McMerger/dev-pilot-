@@ -35,39 +35,60 @@ export interface CreateTaskRequest {
     modelId: string;
 }
 
+// Helper for authenticated requests
+async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+    const token = localStorage.getItem('devpilot-session');
+    const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers,
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+
+    const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+
+    // Handle 401 (Token Expired)
+    if (res.status === 401) {
+        localStorage.removeItem('devpilot-session');
+        window.location.reload();
+        throw new Error('Session expired');
+    }
+
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(error.error || 'API Request Failed');
+    }
+
+    return res.json();
+}
+
 // API Functions
 export async function getModels(): Promise<Model[]> {
-    const res = await fetch(`${API_BASE}/api/models`);
-    if (!res.ok) throw new Error('Failed to fetch models');
-    return res.json();
+    return fetchWithAuth('/api/models');
 }
 
 export async function getProjects(): Promise<Project[]> {
-    const res = await fetch(`${API_BASE}/api/projects`);
-    if (!res.ok) throw new Error('Failed to fetch projects');
-    return res.json();
+    return fetchWithAuth('/api/projects');
+}
+
+export async function getTasks(): Promise<Task[]> {
+    return fetchWithAuth('/api/tasks');
 }
 
 export async function createTask(req: CreateTaskRequest): Promise<Task> {
-    const res = await fetch(`${API_BASE}/api/tasks`, {
+    return fetchWithAuth('/api/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(req),
     });
-    if (!res.ok) throw new Error('Failed to create task');
-    return res.json();
 }
 
 export async function getTask(id: string): Promise<Task> {
-    const res = await fetch(`${API_BASE}/api/tasks/${id}`);
-    if (!res.ok) throw new Error('Task not found');
-    return res.json();
+    return fetchWithAuth(`/api/tasks/${id}`);
 }
 
 export async function checkAgentHealth(): Promise<boolean> {
     try {
-        const res = await fetch(`${API_BASE}/api/projects`);
-        return res.ok;
+        await fetchWithAuth('/api/projects');
+        return true;
     } catch {
         return false;
     }

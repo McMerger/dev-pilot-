@@ -44,7 +44,7 @@ export function TopBar({ selectedProject, onSelectProject, currentTheme, onSetTh
                     onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
                     className="flex items-center gap-2 text-sm font-medium text-foreground hover:bg-accent/50 px-2 py-1.5 rounded-md transition-colors"
                 >
-                    <span>{selectedProject?.name || 'Select Project'}</span>
+                    <span className="truncate max-w-[120px] sm:max-w-xs">{selectedProject?.name || 'Select Project'}</span>
                     <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </button>
 

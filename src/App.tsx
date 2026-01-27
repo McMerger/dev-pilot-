@@ -5,7 +5,7 @@ import { PromptArea } from './components/PromptArea';
 import { TaskList } from './components/TaskList';
 import { Login } from './components/Login';
 import { ProjectGrid } from './components/ProjectGrid';
-import { createTask, getTask, getProjects, type Project, type Model, type Task } from './lib/api';
+import { createTask, getTask, getProjects, getTasks, type Project, type Model, type Task } from './lib/api';
 
 import { useTheme } from './lib/theme';
 
@@ -20,38 +20,37 @@ function App() {
     const [selectedModel, setSelectedModel] = useState<Model | null>(null);
 
     // Task Persistence
-    const [tasks, setTasks] = useState<Task[]>(() => {
-        try {
-            const saved = localStorage.getItem('devpilot-tasks');
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-            console.error("Failed to parse tasks", e);
-            return [];
-        }
-    });
-
+    const [tasks, setTasks] = useState<Task[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Theme
     const { theme, setTheme } = useTheme();
 
-    // Check for existing session
+    // Check for existing session or URL token
     useEffect(() => {
-        const savedSession = localStorage.getItem('devpilot-session');
-        if (savedSession) {
+        // 1. Check URL for token (OAuth callback)
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+
+        if (token) {
+            localStorage.setItem('devpilot-session', token); // Store JWT
             setIsLoggedIn(true);
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+            // 2. Check LocalStorage
+            const savedSession = localStorage.getItem('devpilot-session');
+            if (savedSession) {
+                setIsLoggedIn(true);
+            }
         }
     }, []);
 
-    // Persist tasks
-    useEffect(() => {
-        localStorage.setItem('devpilot-tasks', JSON.stringify(tasks));
-    }, [tasks]);
-
-    // Fetch projects when logged in
+    // Fetch data when logged in
     useEffect(() => {
         if (isLoggedIn) {
             getProjects().then(setAvailableProjects).catch(console.error);
+            getTasks().then(setTasks).catch(console.error);
         }
     }, [isLoggedIn]);
 
