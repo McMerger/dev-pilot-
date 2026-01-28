@@ -180,7 +180,12 @@ export function SettingsModal({ currentTheme, onSetTheme, open, onOpenChange, on
                      I will assume standard appearance content or use what I wrote in Step 541.
                   */}
                                 <div className="grid grid-cols-2 gap-4">
-                                    {['light', 'dark', 'dracula', 'monokai', 'github'].map((t) => (
+                                    {/* Import THEMES from theme.ts needs to be added to top of file if not present */}
+                                    {/* Actually I'll just hardcode the Correct list for safety if I can't add import easily */
+                                        /* Wait, I can see imports. import { type Theme } from '../lib/theme'; */
+                                        /* I need to change import to: import { type Theme, THEMES } from '../lib/theme'; */
+                                    }
+                                    {['default', 'light', 'dracula', 'monokai', 'github-dark'].map((t) => (
                                         <button
                                             key={t}
                                             onClick={() => onSetTheme(t as Theme)}
@@ -189,7 +194,7 @@ export function SettingsModal({ currentTheme, onSetTheme, open, onOpenChange, on
                                                 : 'border-border hover:border-border/80 hover:bg-accent/50'
                                                 }`}
                                         >
-                                            <div className="font-medium capitalize mb-1">{t}</div>
+                                            <div className="font-medium capitalize mb-1">{t.replace('-', ' ')}</div>
                                             <div className="flex gap-1">
                                                 <div className="w-4 h-4 rounded-full bg-background border border-border" />
                                                 <div className="w-4 h-4 rounded-full bg-primary" />

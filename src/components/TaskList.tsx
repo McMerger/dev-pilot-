@@ -98,13 +98,55 @@ export function TaskList({ tasks }: TaskListProps) {
                                             <span className={cn(
                                                 "text-[10px] px-1.5 py-0.5 rounded font-medium",
                                                 task.status === 'done' && "bg-emerald-500/20 text-emerald-400",
-                                                task.status === 'running' && "bg-blue-500/20 text-blue-400",
+                                                task.status === 'running' && "bg-blue-500/20 text-blue-400 animate-pulse",
                                                 task.status === 'error' && "bg-red-500/20 text-red-400",
                                                 (task.status === 'pending' || task.status === 'planning') && "bg-amber-500/20 text-amber-400"
                                             )}>
                                                 {task.status.toUpperCase()}
                                             </span>
+                                            <span className="text-[10px] text-muted-foreground/60">{formatTime(task.createdAt)}</span>
                                         </div>
+
+                                        {isExpanded && (
+                                            <div className="mt-4 space-y-4 animate-in fade-in duration-300">
+                                                {/* Logs Section */}
+                                                {(task.logs?.length > 0 || task.status === 'running') && (
+                                                    <div className="bg-black/50 rounded-md p-3 font-mono text-xs text-muted-foreground border border-border/50 max-h-48 overflow-y-auto">
+                                                        <div className="flex items-center gap-2 mb-2 text-foreground/50 border-b border-border/20 pb-1">
+                                                            <Terminal className="w-3 h-3" />
+                                                            <span>Agent Logs</span>
+                                                        </div>
+                                                        {task.logs?.map((log, i) => (
+                                                            <div key={i} className="whitespace-pre-wrap break-all">{log}</div>
+                                                        ))}
+                                                        {task.status === 'running' && (
+                                                            <div className="animate-pulse">_</div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Diffs Section */}
+                                                {task.diffs?.length > 0 && (
+                                                    <div className="bg-secondary/10 rounded-md p-3 text-xs border border-border/50">
+                                                        <div className="flex items-center gap-2 mb-2 text-foreground/50 border-b border-border/20 pb-1">
+                                                            <span>File Changes</span>
+                                                        </div>
+                                                        <ul className="space-y-1">
+                                                            {task.diffs.map((diff, i) => (
+                                                                <li key={i} className={cn(
+                                                                    "font-mono",
+                                                                    diff.toUpperCase().includes('[CREATE]') && "text-emerald-400",
+                                                                    diff.toUpperCase().includes('[DELETE]') && "text-red-400",
+                                                                    diff.toUpperCase().includes('[UPDATE]') && "text-amber-400"
+                                                                )}>
+                                                                    {diff}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="text-[10px] text-muted-foreground whitespace-nowrap">

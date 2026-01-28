@@ -116,7 +116,23 @@ export function AgentHeader({ selectedMode, onSelectMode, selectedModel, onSelec
                             <div className="p-1.5 bg-muted/30 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-y border-border/50">
                                 OpenAI
                             </div>
-                            {models.filter(m => !m.id.includes('gemini') && !m.id.includes('claude')).map((model) => (
+                            {models.filter(m => m.id.includes('gpt')).map((model) => (
+                                <button
+                                    key={model.id}
+                                    onClick={() => {
+                                        onSelectModel(model);
+                                        setModelDropdown(false);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50"
+                                >
+                                    {model.label}
+                                </button>
+                            ))}
+
+                            <div className="p-1.5 bg-muted/30 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-y border-border/50">
+                                Kimi (Moonshot)
+                            </div>
+                            {models.filter(m => m.id.includes('kimi') || m.id.includes('moonshot')).map((model) => (
                                 <button
                                     key={model.id}
                                     onClick={() => {

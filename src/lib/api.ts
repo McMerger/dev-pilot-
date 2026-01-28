@@ -23,6 +23,7 @@ export interface Task {
     modelId: string;
     status: 'pending' | 'planning' | 'running' | 'done' | 'error';
     logs: string[];
+    diffs: string[];
     resultSummary: string | null;
     createdAt: string;
     updatedAt: string;
