@@ -33,6 +33,7 @@ export interface CreateTaskRequest {
     prompt: string;
     mode: string;
     modelId: string;
+    history?: { role: string; content: string }[];
 }
 
 // Helper for authenticated requests

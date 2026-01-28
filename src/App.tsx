@@ -99,11 +99,18 @@ function App() {
 
         setIsSubmitting(true);
         try {
+            // Build recent history (last 5 tasks)
+            const history = tasks.slice(0, 5).reverse().map(t => ({
+                role: 'user',
+                content: `[Previous Task: ${t.prompt}]\n[Result: ${t.resultSummary || 'Completed'}]`
+            }));
+
             const task = await createTask({
                 projectId: selectedProject.id,
                 prompt,
                 mode: selectedMode,
                 modelId: selectedModel.id,
+                history
             });
             setTasks((prev) => [task, ...prev]);
 

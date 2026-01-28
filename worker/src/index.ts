@@ -10,6 +10,12 @@ type Bindings = {
     GOOGLE_CLIENT_ID: string;
     GOOGLE_CLIENT_SECRET: string;
     JWT_SECRET: string;
+    DEFAULT_MODEL_PROVIDER?: string;
+    DEFAULT_MODEL_ID?: string;
+    GEMINI_API_KEY?: string;
+    ANTHROPIC_API_KEY?: string;
+    MOONSHOT_API_KEY?: string;
+    OPENAI_API_KEY?: string;
 };
 
 interface AiTextGenerationInput {
@@ -43,10 +49,15 @@ app.use('/*', cors());
 
 // Available models
 const MODELS = [
+    { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+    { id: 'claude-3-5-sonnet-20240620', label: 'Claude 3.5 Sonnet' },
+    { id: 'gpt-4o', label: 'GPT-4o' },
     { id: 'gemini-3-pro-high', label: 'Gemini 3 Pro High' },
     { id: 'gemini-3-pro-low', label: 'Gemini 3 Pro Low' },
     { id: 'claude-sonnet-4.5', label: 'Claude Sonnet 4.5' },
     { id: 'claude-sonnet-4.5-thinking', label: 'Claude Sonnet 4.5 (Thinking)' },
+    { id: 'claude-opus-4.5', label: 'Claude Opus 4.5' },
+    { id: 'kimi-k2.5', label: 'Kimi K2.5 (Moonshot)' },
     { id: 'gpt-oss-120b', label: 'GPT OSS 120B (Medium)' },
 ];
 
@@ -76,6 +87,7 @@ interface Task {
     modelId: string;
     status: 'pending' | 'planning' | 'running' | 'done' | 'error';
     logs: string[];
+    diffs: string[]; // For streaming file changes
     resultSummary: string | null;
     createdAt: string;
     updatedAt: string;
@@ -86,6 +98,7 @@ interface Storage {
     getTask(id: string): Promise<Task | null>;
     saveTask(task: Task): Promise<void>;
     listTasks(userId: string): Promise<Task[]>;
+    getProjectTasks(userId: string, projectId: string): Promise<Task[]>;
     // Federation
     registerAgent(node: AgentNode): Promise<void>;
     listAgents(): Promise<AgentNode[]>;
@@ -142,8 +155,13 @@ class DurableStorage implements Storage {
 
         return Array.from(this.mem.values())
             .map(s => JSON.parse(s) as Task)
-            .filter(t => t.userId === userId && t.provider)
+            .filter(t => t.userId === userId)
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+
+    async getProjectTasks(userId: string, projectId: string): Promise<Task[]> {
+        const all = await this.listTasks(userId);
+        return all.filter(t => t.projectId === projectId).slice(0, 5); // Return last 5
     }
 
     // Stateless Registry Implementation
@@ -555,6 +573,18 @@ app.get('/api/tasks', async (c) => {
     return c.json(tasks);
 });
 
+// GET /api/tasks/:id - Get task details
+app.get('/api/tasks/:id', async (c) => {
+    const userId = c.get('userId');
+    const taskId = c.req.param('id');
+    const task = await storage.getTask(taskId);
+
+    if (!task) return c.json({ error: 'Task not found' }, 404);
+    if (task.userId !== userId) return c.json({ error: 'Unauthorized' }, 403);
+
+    return c.json(task);
+});
+
 // POST /api/tasks - create a new task with LLM Routing
 app.post('/api/tasks', async (c) => {
     const userId = c.get('userId');
@@ -563,12 +593,23 @@ app.post('/api/tasks', async (c) => {
         prompt: string;
         mode: string;
         modelId: string;
+        history?: { role: string; content: string }[];
     }>();
 
     // LLM Routing Logic
-    let provider = 'openai';
-    if (body.modelId.includes('gemini')) provider = 'google';
-    if (body.modelId.includes('claude')) provider = 'anthropic';
+    let provider = (c.env.DEFAULT_MODEL_PROVIDER || 'openai').toLowerCase();
+
+    // Normalize provider names from config/readme to internal keys
+    if (provider === 'gemini') provider = 'google';
+    if (provider === 'claude') provider = 'anthropic';
+    if (provider === 'kimi') provider = 'moonshot';
+    if (provider === 'gpt') provider = 'openai';
+
+    if (body.modelId) {
+        if (body.modelId.includes('gemini')) provider = 'google';
+        else if (body.modelId.includes('claude')) provider = 'anthropic';
+        else if (body.modelId.includes('kimi')) provider = 'moonshot';
+    }
 
     console.log(`[Router] Routing request to ${provider} via ${body.modelId}`);
 
@@ -581,6 +622,7 @@ app.post('/api/tasks', async (c) => {
         modelId: body.modelId,
         status: 'pending',
         logs: [],
+        diffs: [],
         resultSummary: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -648,30 +690,58 @@ app.post('/api/tasks', async (c) => {
                     }
                 }
 
+                // 1.5 Fetch Per-Project Memory (Server-Side)
+                const recentTasks = await storage.getProjectTasks(userId, body.projectId);
+                const serverHistory = recentTasks
+                    .filter(t => t.id !== task.id) // Exclude current
+                    .map(t => ({
+                        role: 'system',
+                        content: `[History] Task: ${t.prompt}\nResult: ${t.resultSummary || 'Completed'}`
+                    }));
+
                 // 2. Run Agentic Loop (ReAct)
                 const MAX_STEPS = 5;
                 let currentStep = 0;
                 let finalResponse = "";
+
+                // Select Model based on ID
+                let selectedModel = c.env.DEFAULT_MODEL_ID || '@cf/meta/llama-3-8b-instruct'; // Default from env or fallback
+                if (body.modelId) {
+                    if (body.modelId.includes('gemini')) selectedModel = '@cf/google/gemma-7b-it-lora';
+                    else if (body.modelId.includes('claude')) selectedModel = '@cf/mistral/mistral-7b-instruct-v0.1'; // Proxy
+                    else if (body.modelId.includes('kimi')) selectedModel = '@cf/meta/llama-3-8b-instruct'; // Proxy
+                    else if (body.modelId.includes('gpt')) selectedModel = '@cf/meta/llama-3-8b-instruct'; // Proxy
+                    else if (body.modelId.includes('fast')) selectedModel = '@cf/meta/llama-3-8b-instruct';
+                }
+                console.log(`[Model] Selected: ${selectedModel} (requested: ${body.modelId})`);
+
                 const messageHistory = [
                     {
                         role: 'system',
                         content: `You are DevPilot, an advanced coding agent connected to the user's local filesystem.
-
+                        
 AVAILABLE TOOLS:
-1. read_file(path: string): Reads file content.
-2. write_to_file(path: string, content: string): Creates or overwrites a file.
-3. run_command(command: string): Runs a shell command.
-4. list_files(path: string): Lists directory contents.
+1. list_files(path: string): List directory contents.
+2. read_file(path: string): Read file content.
+3. apply_patch(ops: { op: 'create'|'update'|'delete', path: string, content?: string }[]): Create, update, or delete files.
+4. run_command(command: string): Execute whitelisted commands.
 
 FORMAT:
 To use a tool, you must output a SINGLE JSON object in this exact format and NOTHING else:
 { "tool": "read_file", "args": { "path": "src/App.tsx" } }
+OR
+{ "tool": "apply_patch", "args": { "ops": [{ "op": "create", "path": "foo.txt", "content": "bar" }] } }
 
 To speak to the user (final answer), output standard text (not JSON).
 
 CURRENT PROJECT CONTEXT:
-${fileContext}`
+${fileContext}
+`
                     },
+                    // Inject Context from Previous Tasks (Server Side Source of Truth)
+                    ...serverHistory,
+                    // Inject Client Context (if any extra)
+                    ...(body.history || []).map(h => ({ role: 'system', content: `CLIENT CONTEXT:\n${h.content}` })),
                     { role: 'user', content: body.prompt }
                 ];
 
@@ -679,7 +749,31 @@ ${fileContext}`
                     console.log(`[Agent] Step ${currentStep + 1}/${MAX_STEPS}`);
 
                     // Call LLM
-                    const aiRes = await c.env.AI.run('@cf/meta/llama-3-8b-instruct', { messages: messageHistory });
+                    let aiRes;
+                    const effectiveModelId = body.modelId || c.env.DEFAULT_MODEL_ID || 'gpt-4o';
+
+                    try {
+                        if (provider === 'google' && c.env.GEMINI_API_KEY) {
+                            aiRes = await runGemini(effectiveModelId, c.env.GEMINI_API_KEY, messageHistory);
+                        }
+                        else if (provider === 'anthropic' && c.env.ANTHROPIC_API_KEY) {
+                            aiRes = await runAnthropic(effectiveModelId, c.env.ANTHROPIC_API_KEY, messageHistory);
+                        }
+                        else if (provider === 'moonshot' && c.env.MOONSHOT_API_KEY) {
+                            // Moonshot ignores model ID usually or uses simplified one? Using passed ID or standard 8k
+                            aiRes = await runOpenAI('https://api.moonshot.cn/v1', 'moonshot-v1-8k', c.env.MOONSHOT_API_KEY, messageHistory);
+                        }
+                        else if (provider === 'openai' && c.env.OPENAI_API_KEY) {
+                            aiRes = await runOpenAI('https://api.openai.com/v1', effectiveModelId, c.env.OPENAI_API_KEY, messageHistory);
+                        }
+                        else {
+                            // Fallback to Cloudflare Workers AI
+                            aiRes = await c.env.AI.run(selectedModel, { messages: messageHistory });
+                        }
+                    } catch (e) {
+                        console.error(`Model ${selectedModel} (Provider: ${provider}) failed, falling back to Llama 3`, e);
+                        aiRes = await c.env.AI.run('@cf/meta/llama-3-8b-instruct', { messages: messageHistory });
+                    }
                     const aiText = typeof aiRes === 'string' ? aiRes : (aiRes as { response: string }).response;
 
                     // Log AI Act
@@ -753,13 +847,13 @@ ${fileContext}`
                                         body: JSON.stringify({ projectId: body.projectId, path: toolCall.args.path })
                                     });
                                 }
-                                else if (toolCall.tool === 'write_to_file') {
+                                else if (toolCall.tool === 'apply_patch') {
                                     res = await fetch(`${targetUrl}/tools/apply_patch`, {
                                         method: 'POST',
                                         headers,
                                         body: JSON.stringify({
                                             projectId: body.projectId,
-                                            operations: [{ op: 'create', path: toolCall.args.path, content: toolCall.args.content }]
+                                            operations: toolCall.args.ops
                                         })
                                     });
                                 }
@@ -788,8 +882,30 @@ ${fileContext}`
                                     } else {
                                         const data = await res.json();
                                         if (toolCall.tool === 'read_file') toolResult = (data as any).content || "Empty";
-                                        else if (toolCall.tool === 'write_to_file') toolResult = (data as any).errors?.length ? `Errors: ${(data as any).errors}` : "Success";
+                                        else if (toolCall.tool === 'apply_patch') {
+                                            const errors = (data as any).errors;
+                                            if (errors?.length) {
+                                                toolResult = `Errors: ${errors}`;
+                                            } else {
+                                                toolResult = "Success";
+                                                // Capture Diff Summary
+                                                const ops = toolCall.args.ops as { op: string, path: string, content?: string }[];
+                                                const diffStrings = ops.map(o => `[${o.op.toUpperCase()}] ${o.path}`);
+
+                                                // Async push to storage for streaming
+                                                storage.getTask(task.id).then(t => {
+                                                    if (t) {
+                                                        t.diffs.push(...diffStrings);
+                                                        return storage.saveTask(t);
+                                                    }
+                                                }).catch(console.error);
+                                            }
+                                        }
                                         else if (toolCall.tool === 'run_command') toolResult = `Exit: ${(data as any).exitCode}\n${(data as any).stdout}`;
+                                        else if (toolCall.tool === 'list_files') {
+                                            const entries = data as { name: string, isDir: boolean }[];
+                                            toolResult = entries.map(e => e.isDir ? `${e.name}/` : e.name).join('\n').slice(0, 4000);
+                                        }
                                         else toolResult = JSON.stringify(data).slice(0, 1000);
                                     }
                                 }
@@ -952,6 +1068,72 @@ app.get('/health', (c) => {
         version: 'v2.1-kv-enabled'
     });
 });
+
+// --- External LLM Clients ---
+
+async function runGemini(model: string, apiKey: string, messages: { role: string; content: string }[]) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const contents = messages.map(m => ({
+        role: m.role === 'system' || m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+    }));
+
+    // Safety fallback: if first msg is system, prepend to next user msg or send as user msg
+    // Gemini API strictness varies; simple mapping for now.
+
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents })
+    });
+
+    const data = await res.json() as any;
+    if (data.error) throw new Error(data.error.message);
+    return { response: data.candidates?.[0]?.content?.parts?.[0]?.text || "" };
+}
+
+async function runAnthropic(model: string, apiKey: string, messages: { role: string; content: string }[]) {
+    const system = messages.find(m => m.role === 'system')?.content || '';
+    const turns = messages.filter(m => m.role !== 'system');
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+            model,
+            system,
+            messages: turns,
+            max_tokens: 4096
+        })
+    });
+
+    const data = await res.json() as any;
+    if (data.error) throw new Error(data.error.message);
+    return { response: data.content?.[0]?.text || "" };
+}
+
+async function runOpenAI(baseUrl: string, model: string, apiKey: string, messages: { role: string; content: string }[]) {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.2
+        })
+    });
+
+    const data = await res.json() as any;
+    if (data.error) throw new Error(data.error.message);
+    return { response: data.choices?.[0]?.message?.content || "" };
+}
 
 export default app;
 
