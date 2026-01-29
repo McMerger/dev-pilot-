@@ -3,7 +3,7 @@ import { cors } from 'hono/cors';
 
 type Bindings = {
     AGENT_ENDPOINT: string;
-    DEVPILOT_KV: KVNamespace;
+    SPLITLINE_KV: KVNamespace;
     AI: Ai;
     GITHUB_CLIENT_ID: string;
     GITHUB_CLIENT_SECRET: string;
@@ -35,11 +35,11 @@ const app = new Hono<{ Bindings: Bindings, Variables: { userId: string } }>();
 // Inject Storage with KV if available
 app.use('*', async (c, next) => {
     // Re-initialize storage with environment binding if present
-    if (c.env.DEVPILOT_KV) {
+    if (c.env.SPLITLINE_KV) {
         // We use a singleton pattern or attached to context in real apps
         // For this simple demo, we rely on the global 'storage' instance
         // But we need to update its internal KV reference
-        (storage as DurableStorage).kv = c.env.DEVPILOT_KV;
+        (storage as DurableStorage).kv = c.env.SPLITLINE_KV;
     }
     await next();
 });
@@ -328,7 +328,7 @@ app.use('*', async (c, next) => {
     // Shared Secret Auth (Simple)
     // In prod, use c.env.AGENT_SECRET
     const secret = c.req.header('X-Agent-Secret');
-    const expected = 'devpilot-secret-key';
+    const expected = 'splitline-secret-key';
 
     // Only verify secret for agent routes, or allow public access to UI?
     // For this demo, we'll allow public UI, but protect Agent Heartbeat
@@ -424,7 +424,7 @@ app.get('/api/auth/:provider/callback', async (c) => {
 
             // Get User Info
             const userRes = await fetch('https://api.github.com/user', {
-                headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'User-Agent': 'DevPilot' }
+                headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'User-Agent': 'Splitline' }
             });
             const userData = await userRes.json() as { id: number; login: string; name: string; email?: string; avatar_url: string };
 
@@ -467,7 +467,7 @@ app.get('/api/auth/:provider/callback', async (c) => {
     const token = await signJWT(user, c.env.JWT_SECRET || 'dev-secret');
 
     // Redirect to Frontend
-    return c.redirect(`https://dev-pilot.pages.dev?token=${token}`);
+    return c.redirect(`https://splitline.pages.dev?token=${token}`);
 });
 
 // GET /api/models
@@ -662,7 +662,7 @@ app.post('/api/tasks', async (c) => {
                         try {
                             const fsRes = await fetch(`${targetUrl}/tools/list_files`, {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'X-Agent-Secret': 'devpilot-secret-key' },
+                                headers: { 'Content-Type': 'application/json', 'X-Agent-Secret': 'splitline-secret-key' },
                                 body: JSON.stringify({ projectId: body.projectId, path: '.' })
                             });
                             const data = await fsRes.json();
@@ -718,7 +718,7 @@ app.post('/api/tasks', async (c) => {
                 const messageHistory = [
                     {
                         role: 'system',
-                        content: `You are DevPilot, an advanced coding agent connected to the user's local filesystem.
+                        content: `You are Splitline, an advanced coding agent connected to the user's local filesystem.
                         
 AVAILABLE TOOLS:
 1. list_files(path: string): List directory contents.

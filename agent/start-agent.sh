@@ -7,7 +7,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}🚀 Starting DevPilot Local Bridge (Unix/Mac)...${NC}"
+echo -e "${GREEN}🚀 Starting Splitline Local Bridge (Unix/Mac)...${NC}"
 
 # --- 0. Self-Healing: Kill Zombies on Port 4001 ---
 PORT=4001

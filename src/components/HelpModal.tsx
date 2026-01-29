@@ -27,7 +27,7 @@ export function HelpModal() {
 
                     <div className="space-y-4 text-sm text-foreground/90">
                         <p>
-                            DevPilot works by modifying files directly on your disk. It is compatible with <strong>any IDE</strong> that detects file changes.
+                            Splitline works by modifying files directly on your disk. It is compatible with <strong>any IDE</strong> that detects file changes.
                         </p>
 
                         <div className="grid gap-3">
@@ -48,7 +48,7 @@ export function HelpModal() {
                         </div>
 
                         <div className="pt-2 text-xs text-muted-foreground text-center">
-                            DevPilot connects via Local Agent
+                            Splitline connects via Local Agent
                         </div>
                     </div>
                 </Dialog.Content>

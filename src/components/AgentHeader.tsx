@@ -37,7 +37,7 @@ export function AgentHeader({ selectedMode, onSelectMode, selectedModel, onSelec
                 <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                     <Bot className="w-5 h-5 md:w-6 md:h-6" />
                 </div>
-                <h1 className="text-lg md:text-xl font-semibold tracking-tight">DevPilot</h1>
+                <h1 className="text-lg md:text-xl font-semibold tracking-tight">Splitline</h1>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">

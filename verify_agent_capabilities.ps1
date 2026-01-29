@@ -1,11 +1,11 @@
 
 # verify_agent_capabilities.ps1
 $AgentUrl = "http://localhost:4001"
-$ProjectId = "proj_devpilot"
+$ProjectId = "proj_splitline"
 $TestFile = "src/test_agent_write.txt"
-$TestContent = "DevPilot Agent Write Verification " + (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+$TestContent = "Splitline Agent Write Verification " + (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
 
-Write-Host "Verifying DevPilot Agent Capabilities..." -ForegroundColor Cyan
+Write-Host "Verifying Splitline Agent Capabilities..." -ForegroundColor Cyan
 
 # 1. Test Writing
 Write-Host "[1/3] Testing Write Capability..." -NoNewline

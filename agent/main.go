@@ -37,7 +37,7 @@ func main() {
 	})
 
 	addr := fmt.Sprintf("%s:%d", cfg.Listen.Host, cfg.Listen.Port)
-	log.Printf("DevPilot Agent [%s] listening on %s", cfg.AgentID, addr)
+	log.Printf("Splitline Agent [%s] listening on %s", cfg.AgentID, addr)
 	log.Printf("Serving %d project(s)", len(cfg.Projects))
 
 	// Chain middlewares: CORS -> Audit
@@ -61,7 +61,7 @@ func main() {
 
 // Improved Heartbeat with dynamic URL support
 func startHeartbeatWithUrl(cfg *Config, publicUrl string) {
-	workerURL := "https://devpilot-worker.cortesmailles01.workers.dev/api/agents/heartbeat"
+	workerURL := "https://splitline-worker.cortesmailles01.workers.dev/api/agents/heartbeat"
 
 	ticker := time.NewTicker(30 * time.Second)
 	// Send immediate first heatbeat
@@ -97,7 +97,7 @@ func sendHeartbeat(workerURL, publicUrl string, cfg *Config) {
 	req.Header.Set("Content-Type", "application/json")
 
 	// In a real app, this would be a secure token exchanged at startup
-	req.Header.Set("X-Agent-Secret", "devpilot-secret-key")
+	req.Header.Set("X-Agent-Secret", "splitline-secret-key")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

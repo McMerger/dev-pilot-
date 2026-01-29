@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-Write-Host "🚀 Starting DevPilot Local Bridge..." -ForegroundColor Cyan
+Write-Host "🚀 Starting Splitline Local Bridge..." -ForegroundColor Cyan
 
 # 0. Self-Healing: Kill Zombies on Port 4001
 try {
@@ -57,7 +57,7 @@ Write-Host "   > (Press Ctrl+C to stop)" -ForegroundColor DarkGray
 
 try {
     # Run the compiled agent
-    .\devpilot-agent.exe $url
+    .\splitline-agent.exe $url
 }
 finally {
     Write-Host "`n🛑 Shutting down..." -ForegroundColor Red

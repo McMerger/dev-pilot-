@@ -17,7 +17,7 @@ export function Login({ }: LoginProps) {
                     <div className="mx-auto w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 ring-1 ring-border shadow-lg">
                         <Bot className="w-8 h-8 text-primary" />
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome to DevPilot</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome to Splitline</h1>
                     <p className="text-muted-foreground text-sm">
                         Your pocket-sized AI coding companion. <br />
                         Connect to your local agent to start.
@@ -60,7 +60,7 @@ export function Login({ }: LoginProps) {
                 </div>
 
                 <p className="text-center text-xs text-muted-foreground pt-8">
-                    By continuing, you acknowledge that DevPilot modifies files on your local machine.
+                    By continuing, you acknowledge that Splitline modifies files on your local machine.
                 </p>
 
                 <div className="pt-8 border-t border-border/30">

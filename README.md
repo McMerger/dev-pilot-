@@ -1,10 +1,10 @@
-# DevPilot
+# Splitline
 
 Work on your projects from your phone.
 
-DevPilot is an open‑source sidecar agent that lets you send natural‑language coding tasks to your dev machine from anywhere, then continue the same conversations you have in your IDE’s AI chat while you’re away.
+Splitline is an open‑source sidecar agent that lets you send natural‑language coding tasks to your dev machine from anywhere, then continue the same conversations you have in your IDE’s AI chat while you’re away.
 
-You type a prompt into a mobile‑friendly web app. DevPilot forwards your task (plus recent project context) to a local agent running on your machine, which edits files and runs commands in the projects you have open in your IDE.
+You type a prompt into a mobile‑friendly web app. Splitline forwards your task (plus recent project context) to a local agent running on your machine, which edits files and runs commands in the projects you have open in your IDE.
 
 Works with any IDE: VS Code, Cursor, Windsurf, Antigravity, Neovim, JetBrains, or anything that opens files from disk.
 
@@ -14,7 +14,7 @@ Works with any IDE: VS Code, Cursor, Windsurf, Antigravity, Neovim, JetBrains, o
 
 - **Remote development from your phone** — keep your IDE’s AI agent working while you’re away, on any device.
 - **IDE‑agnostic** — sidecar agent works alongside any editor that uses the filesystem.
-- **Bring your own AI** — plug in Gemini, Claude, GPT, Kimi K2.5, or any LLM API you already pay for; DevPilot just routes requests.
+- **Bring your own AI** — plug in Gemini, Claude, GPT, Kimi K2.5, or any LLM API you already pay for; Splitline just routes requests.
 - **Conversation continuity** — persists per‑project chat history and summaries so you can resume the same thread from desktop or phone.
 - **Safe execution** — whitelisted commands, sandboxed file access, zero‑trust design.
 - **Real‑time status updates** — live task progress, logs, and diffs streamed back to the UI.
@@ -25,7 +25,7 @@ Works with any IDE: VS Code, Cursor, Windsurf, Antigravity, Neovim, JetBrains, o
 
 ## Architecture
 
-DevPilot uses a distributed edge‑first architecture designed for reliability, minimal latency, and safe access to your local projects.
+Splitline uses a distributed edge‑first architecture designed for reliability, minimal latency, and safe access to your local projects.
 
 ```text
                           ╔════════════════════════════════════╗
@@ -77,8 +77,8 @@ DevPilot uses a distributed edge‑first architecture designed for reliability, 
 ### 1. Clone and Install
 
 ```bash
-git clone https://github.com/McMerger/dev-pilot-.git
-cd dev-pilot-
+git clone https://github.com/McMerger/splitline-.git
+cd splitline-
 
 # Frontend
 npm install
@@ -96,7 +96,7 @@ Edit `agent/agent.config.json` to add your projects:
 
 ```json
 {
-  "agentId": "my-devpilot-agent",
+  "agentId": "my-splitline-agent",
   "listen": { "host": "0.0.0.0", "port": 4001 },
   "projects": [
     {
@@ -141,18 +141,18 @@ Open `http://localhost:5173` on your phone (same network) or desktop.
 
 ## Using with Your IDE
 
-DevPilot does not replace your IDE’s AI features; it extends them for remote use and shared memory.
+Splitline does not replace your IDE’s AI features; it extends them for remote use and shared memory.
 
 1. Keep your IDE open with the project folder loaded.
 2. Start the local agent on the same machine.
-3. Use DevPilot from your phone to:
+3. Use Splitline from your phone to:
    - Continue existing AI conversations about that project.
    - Ask for new tasks (refactors, tests, small features).
 4. File changes and command output appear in your IDE in real time.
 
 ### Supported IDEs
 
-Any IDE that opens files from disk works with DevPilot:
+Any IDE that opens files from disk works with Splitline:
 
 | IDE | Notes |
 | :--- | :--- |
@@ -199,7 +199,7 @@ For production, set `AGENT_ENDPOINT` to your Cloudflare Tunnel or Tailscale URL.
 
 ## Memory & Conversation Continuity
 
-DevPilot keeps lightweight, per‑project memory so you can resume work from anywhere:
+Splitline keeps lightweight, per‑project memory so you can resume work from anywhere:
 
 - Stores recent chat turns per `projectId` + thread.
 - Maintains short project and thread summaries to keep context under token limits.
@@ -211,7 +211,7 @@ The default implementation uses a simple database / KV store and can be swapped 
 
 ## Deployment
 
-DevPilot is designed for instant global deployment with minimal provisioning.
+Splitline is designed for instant global deployment with minimal provisioning.
 
 ### Deploy Worker to Cloudflare
 
@@ -246,7 +246,7 @@ Update `AGENT_ENDPOINT` in your Worker config to the tunnel URL.
 
 ## Security
 
-DevPilot follows a zero‑trust, defense‑in‑depth security model:
+Splitline follows a zero‑trust, defense‑in‑depth security model:
 
 - **Project allowlist** — only configured directories are accessible.
 - **Command allowlist** — only specified commands per project can run.

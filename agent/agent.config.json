@@ -1,13 +1,13 @@
 {
-    "agentId": "devpilot-agent-local-1",
+    "agentId": "splitline-agent-local-1",
     "listen": {
         "host": "0.0.0.0",
         "port": 4001
     },
     "projects": [
         {
-            "id": "proj_devpilot",
-            "name": "DevPilot",
+            "id": "proj_splitline",
+            "name": "Splitline",
             "root": "E:/DevPilot",
             "allowedCommands": [
                 "npm test",
